@@ -1,0 +1,33 @@
+# Infraestrutura local: PostgreSQL 15 + TimescaleDB e Redis 7.
+# Uso: docker compose up -d
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: ibovespa-postgres
+    environment:
+      POSTGRES_USER: ibovespa
+      POSTGRES_PASSWORD: ibovespa
+      POSTGRES_DB: ibovespa
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ibovespa -d ibovespa']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ibovespa-redis
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

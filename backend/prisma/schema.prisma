@@ -1,0 +1,57 @@
+// Schema do IBovespa Dashboard.
+// PrecoHistorico vira hypertable do TimescaleDB (ver migration init).
+// Após alterar este arquivo: npx prisma migrate dev --name nome_da_migration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Ativo do IBovespa (ex.: PETR4).
+model Ativo {
+  id        Int              @id @default(autoincrement())
+  ticker    String           @unique
+  nome      String
+  setor     String
+  subsector String?
+  createdAt DateTime         @default(now())
+  precos    PrecoHistorico[]
+  fatos     FatoRelevante[]
+}
+
+/// Candle diário/intradiário (OHLCV). Hypertable particionada por `timestamp`.
+/// A PK inclui `timestamp` porque o TimescaleDB exige a coluna de partição na chave única.
+model PrecoHistorico {
+  id        String   @default(uuid()) @db.Uuid
+  ativoId   Int
+  timestamp DateTime @db.Timestamptz(6)
+  open      Decimal  @db.Decimal(12, 4)
+  high      Decimal  @db.Decimal(12, 4)
+  low       Decimal  @db.Decimal(12, 4)
+  close     Decimal  @db.Decimal(12, 4)
+  volume    BigInt
+  ativo     Ativo    @relation(fields: [ativoId], references: [id], onDelete: Cascade)
+
+  @@id([id, timestamp])
+  @@unique([ativoId, timestamp])
+  @@index([ativoId, timestamp(sort: Desc)])
+}
+
+/// Comunicado oficial (fato relevante, resultado, aviso, assembleia).
+model FatoRelevante {
+  id             String   @id @default(uuid()) @db.Uuid
+  ativoId        Int
+  titulo         String
+  /// Um de: 'Resultado' | 'Fato Relevante' | 'Aviso' | 'Assembleia' | 'Outros'
+  categoria      String
+  dataPublicacao DateTime @db.Timestamptz(6)
+  resumo         String?
+  urlDocumento   String?
+  ativo          Ativo    @relation(fields: [ativoId], references: [id], onDelete: Cascade)
+
+  @@index([ativoId, dataPublicacao(sort: Desc)])
+}

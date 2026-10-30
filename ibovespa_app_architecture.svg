@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 870" width="1200" height="870" font-family="Segoe UI, Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="seta" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94A3B8"/>
+    </marker>
+  </defs>
+
+  <!-- Fundo e título -->
+  <rect width="1200" height="870" fill="#0F172A"/>
+  <text x="45" y="50" font-size="28" font-weight="bold" fill="#F8FAFC">IBovespa Dashboard: arquitetura da aplicação</text>
+  <text x="45" y="78" font-size="15" fill="#94A3B8">Frontend (Next.js) → Backend (Fastify) → Fontes externas e persistência</text>
+
+  <!-- Rótulos de camada -->
+  <text x="45" y="112" font-size="13" font-weight="bold" letter-spacing="1.5" fill="#64748B">FRONTEND (Next.js + TypeScript)</text>
+  <text x="45" y="287" font-size="13" font-weight="bold" letter-spacing="1.5" fill="#64748B">BACKEND (Node.js / Fastify)</text>
+  <text x="45" y="462" font-size="13" font-weight="bold" letter-spacing="1.5" fill="#64748B">FONTES DE DADOS EXTERNAS</text>
+  <text x="45" y="637" font-size="13" font-weight="bold" letter-spacing="1.5" fill="#64748B">PERSISTÊNCIA</text>
+
+  <!-- Setas entre camadas -->
+  <line x1="457.5" y1="236" x2="457.5" y2="298" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="742.5" y1="236" x2="742.5" y2="298" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="1027.5" y1="236" x2="1027.5" y2="298" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+
+  <line x1="457.5" y1="411" x2="457.5" y2="473" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="742.5" y1="411" x2="742.5" y2="473" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="1027.5" y1="411" x2="1027.5" y2="473" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+
+  <line x1="457.5" y1="586" x2="457.5" y2="648" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="742.5" y1="586" x2="742.5" y2="648" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="1027.5" y1="586" x2="1027.5" y2="648" stroke="#94A3B8" stroke-width="2" marker-end="url(#seta)"/>
+
+  <!-- FRONTEND (y=125) -->
+  <rect x="45" y="125" width="255" height="110" rx="12" fill="#1E293B" stroke="#38BDF8" stroke-width="2"/>
+  <text x="172.5" y="170" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Busca</text>
+  <text x="172.5" y="197" font-size="14" fill="#94A3B8" text-anchor="middle">Filtro por ativo</text>
+  <text x="172.5" y="219" font-size="14" fill="#94A3B8" text-anchor="middle">e setor</text>
+
+  <rect x="330" y="125" width="255" height="110" rx="12" fill="#1E293B" stroke="#38BDF8" stroke-width="2"/>
+  <text x="457.5" y="170" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Gráficos</text>
+  <text x="457.5" y="197" font-size="14" fill="#94A3B8" text-anchor="middle">Candlestick, linha</text>
+  <text x="457.5" y="219" font-size="14" fill="#94A3B8" text-anchor="middle">e volume (1D a 5A)</text>
+
+  <rect x="615" y="125" width="255" height="110" rx="12" fill="#1E293B" stroke="#38BDF8" stroke-width="2"/>
+  <text x="742.5" y="170" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Fatos relevantes</text>
+  <text x="742.5" y="197" font-size="14" fill="#94A3B8" text-anchor="middle">Comunicados da B3</text>
+  <text x="742.5" y="219" font-size="14" fill="#94A3B8" text-anchor="middle">filtro 30 / 90 / 180 dias</text>
+
+  <rect x="900" y="125" width="255" height="110" rx="12" fill="#1E293B" stroke="#38BDF8" stroke-width="2"/>
+  <text x="1027.5" y="170" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Recomendações</text>
+  <text x="1027.5" y="197" font-size="14" fill="#94A3B8" text-anchor="middle">IA (Claude API)</text>
+  <text x="1027.5" y="219" font-size="14" fill="#94A3B8" text-anchor="middle">Comprar · Manter · Vender</text>
+
+  <!-- BACKEND (y=300) -->
+  <rect x="45" y="300" width="255" height="110" rx="12" fill="#1E293B" stroke="#A78BFA" stroke-width="2"/>
+  <text x="172.5" y="345" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">REST API Gateway</text>
+  <text x="172.5" y="372" font-size="14" fill="#94A3B8" text-anchor="middle">Roteamento e cache</text>
+  <text x="172.5" y="394" font-size="14" fill="#94A3B8" text-anchor="middle">Fastify, CORS</text>
+
+  <rect x="330" y="300" width="255" height="110" rx="12" fill="#1E293B" stroke="#A78BFA" stroke-width="2"/>
+  <text x="457.5" y="345" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Rate Limit</text>
+  <text x="457.5" y="372" font-size="14" fill="#94A3B8" text-anchor="middle">60 requisições/min por IP</text>
+  <text x="457.5" y="394" font-size="14" fill="#94A3B8" text-anchor="middle">sem auth no MVP</text>
+
+  <rect x="615" y="300" width="255" height="110" rx="12" fill="#1E293B" stroke="#A78BFA" stroke-width="2"/>
+  <text x="742.5" y="345" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Cache (Redis)</text>
+  <text x="742.5" y="372" font-size="14" fill="#94A3B8" text-anchor="middle">Preços: 5 min</text>
+  <text x="742.5" y="394" font-size="14" fill="#94A3B8" text-anchor="middle">Recomendação IA: 1 h</text>
+
+  <rect x="900" y="300" width="255" height="110" rx="12" fill="#1E293B" stroke="#A78BFA" stroke-width="2"/>
+  <text x="1027.5" y="345" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Job Scheduler</text>
+  <text x="1027.5" y="372" font-size="14" fill="#94A3B8" text-anchor="middle">Cron / BullMQ</text>
+  <text x="1027.5" y="394" font-size="14" fill="#94A3B8" text-anchor="middle">Coleta diária às 19h30</text>
+
+  <!-- FONTES EXTERNAS (y=475) -->
+  <rect x="45" y="475" width="255" height="110" rx="12" fill="#1E293B" stroke="#FB923C" stroke-width="2"/>
+  <text x="172.5" y="520" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">brapi + Yahoo</text>
+  <text x="172.5" y="547" font-size="14" fill="#94A3B8" text-anchor="middle">Preços em tempo real</text>
+  <text x="172.5" y="569" font-size="14" fill="#94A3B8" text-anchor="middle">Histórico OHLCV</text>
+
+  <rect x="330" y="475" width="255" height="110" rx="12" fill="#1E293B" stroke="#FB923C" stroke-width="2"/>
+  <text x="457.5" y="520" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">B3 / Investidor10</text>
+  <text x="457.5" y="547" font-size="14" fill="#94A3B8" text-anchor="middle">Fatos relevantes</text>
+  <text x="457.5" y="569" font-size="14" fill="#94A3B8" text-anchor="middle">Scraping controlado</text>
+
+  <rect x="615" y="475" width="255" height="110" rx="12" fill="#1E293B" stroke="#FB923C" stroke-width="2"/>
+  <text x="742.5" y="520" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Alpha Vantage</text>
+  <text x="742.5" y="547" font-size="14" fill="#94A3B8" text-anchor="middle">Fundamentos / DRE</text>
+  <text x="742.5" y="569" font-size="14" fill="#94A3B8" text-anchor="middle">P/L, DY, ROE</text>
+
+  <rect x="900" y="475" width="255" height="110" rx="12" fill="#1E293B" stroke="#FB923C" stroke-width="2"/>
+  <text x="1027.5" y="520" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Claude API</text>
+  <text x="1027.5" y="547" font-size="14" fill="#94A3B8" text-anchor="middle">Análise e recomendação</text>
+  <text x="1027.5" y="569" font-size="14" fill="#94A3B8" text-anchor="middle">modelo claude-sonnet-4-6</text>
+
+  <!-- PERSISTÊNCIA (y=650) -->
+  <rect x="45" y="650" width="255" height="110" rx="12" fill="#1E293B" stroke="#34D399" stroke-width="2"/>
+  <text x="172.5" y="695" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">PostgreSQL</text>
+  <text x="172.5" y="722" font-size="14" fill="#94A3B8" text-anchor="middle">Ativos e histórico</text>
+  <text x="172.5" y="744" font-size="14" fill="#94A3B8" text-anchor="middle">Prisma (ORM)</text>
+
+  <rect x="330" y="650" width="255" height="110" rx="12" fill="#1E293B" stroke="#34D399" stroke-width="2"/>
+  <text x="457.5" y="695" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">TimescaleDB</text>
+  <text x="457.5" y="722" font-size="14" fill="#94A3B8" text-anchor="middle">Séries temporais OHLCV</text>
+  <text x="457.5" y="744" font-size="14" fill="#94A3B8" text-anchor="middle">extensão do PostgreSQL</text>
+
+  <rect x="615" y="650" width="255" height="110" rx="12" fill="#1E293B" stroke="#34D399" stroke-width="2"/>
+  <text x="742.5" y="695" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">Redis</text>
+  <text x="742.5" y="722" font-size="14" fill="#94A3B8" text-anchor="middle">Cache em memória</text>
+  <text x="742.5" y="744" font-size="14" fill="#94A3B8" text-anchor="middle">ioredis</text>
+
+  <rect x="900" y="650" width="255" height="110" rx="12" fill="#1E293B" stroke="#34D399" stroke-width="2"/>
+  <text x="1027.5" y="695" font-size="19" font-weight="bold" fill="#F8FAFC" text-anchor="middle">S3</text>
+  <text x="1027.5" y="722" font-size="14" fill="#94A3B8" text-anchor="middle">Relatórios PDF</text>
+  <text x="1027.5" y="744" font-size="14" fill="#94A3B8" text-anchor="middle">armazenamento de arquivos</text>
+
+  <!-- Legenda -->
+  <text x="45" y="820" font-size="12" fill="#64748B">Azul: frontend · Roxo: backend · Laranja: APIs externas · Verde: persistência</text>
+  <text x="45" y="840" font-size="12" fill="#64748B">Fonte: PRD.md e TASKS.md do projeto IBovespa Dashboard</text>
+</svg>
