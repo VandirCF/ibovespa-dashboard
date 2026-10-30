@@ -166,6 +166,8 @@ formatarData('2026-04-09')  // → "09/04/2026"
 | Fatos relevantes | `fatos:{ticker}` | 3600s | B3 publica algumas vezes ao dia |
 | Indicadores fundamentalistas | `fund:{ticker}` | 86400s | Dados trimestrais |
 | Recomendação IA | `analise:{ticker}` | 3600s | Custo de geração + estabilidade |
+| Último valor bom | `ultimo:{ticker}` | 86400s | Exibido quando brapi e Yahoo falham |
+| Brapi sem acesso | `brapi-sem-acesso:{ticker}` | 21600s | Plano sem o ativo: pula a brapi e usa Yahoo |
 
 ---
 
