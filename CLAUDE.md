@@ -269,7 +269,10 @@ GET /quote/{ticker}?modules=defaultKeyStatistics,financialData,balanceSheetHisto
 // Página: https://statusinvest.com.br/acoes/{ticker}
 // Preço: div[title="Valor atual do ativo"] strong.value
 // Variação: span[title="Variação do valor do ativo com base no dia anterior"] b
+// Volume do dia: h3.title "VOLUME (dia)" → strong.value, em reais.
 // O sinal vem do ícone: arrow_downward = queda. Respeitar o intervalo de 1s (lib/throttle.ts).
+// Unidade do volume em todo o app: R$ (volume financeiro). Brapi e Yahoo informam quantidade
+// de ações; o valor em R$ é estimado multiplicando pelo preço atual.
 ```
 
 ### Yahoo Finance (histórico OHLCV)

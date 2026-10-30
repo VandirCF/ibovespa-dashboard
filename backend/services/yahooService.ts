@@ -58,7 +58,8 @@ function paraAtivoPreco(bruto: unknown): AtivoPreco | null {
     preco: q.regularMarketPrice,
     variacao: q.regularMarketChange,
     variacaoPercent: q.regularMarketChangePercent,
-    volume: q.regularMarketVolume,
+    // Quantidade de ações convertida em volume financeiro pelo preço atual (estimativa).
+    volume: q.regularMarketVolume * q.regularMarketPrice,
     marketCap: q.marketCap ?? null,
   }
 }

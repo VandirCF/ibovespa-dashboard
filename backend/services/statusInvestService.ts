@@ -26,6 +26,8 @@ export interface CotacaoStatusInvest {
   preco: number
   variacao: number
   variacaoPercent: number
+  /** Volume financeiro do dia em reais (já vem em R$ na fonte). */
+  volume: number | null
 }
 
 /**
@@ -45,10 +47,17 @@ export function extrairCotacaoStatusInvest(html: string): CotacaoStatusInvest | 
   const variacaoPercent = emQueda ? -Math.abs(percentual) : Math.abs(percentual)
   // Variação em reais: preço atual menos o fechamento anterior, que sai do percentual.
   const fechamentoAnterior = preco / (1 + variacaoPercent / 100)
+  // Volume do dia: o bloco "VOLUME (dia)" traz o valor financeiro em reais.
+  const titulo = $('h3.title')
+    .filter((_, elemento) => $(elemento).text().trim() === 'VOLUME (dia)')
+    .first()
+  const volume = parseNumeroBR(titulo.parent().find('strong.value').first().text())
+
   return {
     preco,
     variacao: preco - fechamentoAnterior,
     variacaoPercent,
+    volume,
   }
 }
 
@@ -78,7 +87,7 @@ export async function buscarCotacaoStatusInvest(ticker: string): Promise<AtivoPr
       preco: cotacao.preco,
       variacao: cotacao.variacao,
       variacaoPercent: cotacao.variacaoPercent,
-      volume: null,
+      volume: cotacao.volume,
       marketCap: null,
     }
   } catch (erro: unknown) {

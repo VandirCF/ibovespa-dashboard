@@ -32,7 +32,12 @@ const COLUNAS: { campo: Campo; rotulo: string; alinhamento: 'left' | 'right'; cl
     { campo: 'nome', rotulo: 'Nome', alinhamento: 'left', classe: 'hidden md:table-cell' },
     { campo: 'preco', rotulo: 'Preço (R$)', alinhamento: 'right' },
     { campo: 'variacaoPercent', rotulo: 'Variação (%)', alinhamento: 'right' },
-    { campo: 'volume', rotulo: 'Volume', alinhamento: 'right', classe: 'hidden sm:table-cell' },
+    {
+      campo: 'volume',
+      rotulo: 'Volume (R$)',
+      alinhamento: 'right',
+      classe: 'hidden sm:table-cell',
+    },
     { campo: 'setor', rotulo: 'Setor', alinhamento: 'left', classe: 'hidden lg:table-cell' },
   ]
 

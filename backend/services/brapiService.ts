@@ -86,7 +86,8 @@ export async function buscarQuoteBrapi(ticker: string): Promise<AtivoPreco | nul
       preco: q.regularMarketPrice,
       variacao: q.regularMarketChange,
       variacaoPercent: q.regularMarketChangePercent,
-      volume: q.regularMarketVolume,
+      // A brapi informa quantidade de ações; o volume financeiro é estimado pelo preço atual.
+      volume: q.regularMarketVolume * q.regularMarketPrice,
       marketCap: q.marketCap ?? null,
     }
   } catch (erro: unknown) {
