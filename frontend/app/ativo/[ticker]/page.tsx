@@ -38,7 +38,8 @@ function normalizarParametro(bruto: string): string {
  * @param percentual Variação percentual do dia.
  * @returns Classe de cor.
  */
-function classeVariacao(percentual: number): string {
+function classeVariacao(percentual: number | null): string {
+  if (percentual === null) return 'text-slate-400'
   if (percentual > 0) return 'text-alta'
   if (percentual < 0) return 'text-baixa'
   return 'text-slate-400'
@@ -56,7 +57,10 @@ export async function generateMetadata({ params }: PropsDetalhe): Promise<Metada
     if (ativo) {
       return {
         title: `${ticker} - ${ativo.nome} | IBovespa Dashboard`,
-        description: `${ticker} (${ativo.nome}) cotado a ${formatarMoeda(ativo.preco)}, variação de ${formatarVariacao(ativo.variacaoPercent)} no dia.`,
+        description:
+          ativo.variacaoPercent === null
+            ? `${ticker} (${ativo.nome}) cotado a ${formatarMoeda(ativo.preco)}.`
+            : `${ticker} (${ativo.nome}) cotado a ${formatarMoeda(ativo.preco)}, variação de ${formatarVariacao(ativo.variacaoPercent)} no dia.`,
       }
     }
   } catch {
@@ -163,8 +167,10 @@ export default async function DetalheAtivo({ params }: PropsDetalhe) {
             {formatarMoeda(ativo.preco)}
           </p>
           <p className={`font-medium tabular-nums ${classeVariacao(ativo.variacaoPercent)}`}>
-            {formatarVariacao(ativo.variacaoPercent)}{' '}
-            <span className="text-sm">({formatarMoeda(ativo.variacao)})</span>
+            {ativo.variacaoPercent === null ? '—' : formatarVariacao(ativo.variacaoPercent)}{' '}
+            <span className="text-sm">
+              ({ativo.variacao === null ? '—' : formatarMoeda(ativo.variacao)})
+            </span>
           </p>
         </div>
       </section>

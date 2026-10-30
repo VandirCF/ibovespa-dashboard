@@ -177,6 +177,12 @@ const GRUPOS: GrupoIndicadores[] = [
         formatar: formatarPercentual,
       },
       {
+        campo: 'crescimentoReceita5a',
+        rotulo: 'Crescimento da receita (5 anos)',
+        descricao: 'Crescimento médio anual da receita nos últimos 5 anos, em percentual.',
+        formatar: formatarPercentual,
+      },
+      {
         campo: 'crescimentoLucro',
         rotulo: 'Crescimento do lucro (12 meses)',
         descricao: 'Variação do lucro nos últimos 12 meses, em percentual.',

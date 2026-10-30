@@ -9,9 +9,9 @@ const AtivoPrecoSchema = z.object({
   ticker: z.string(),
   nome: z.string(),
   preco: z.number(),
-  variacao: z.number(),
-  variacaoPercent: z.number(),
-  volume: z.number(),
+  variacao: z.number().nullable(),
+  variacaoPercent: z.number().nullable(),
+  volume: z.number().nullable(),
   marketCap: z.number().nullable(),
   setor: z.string().optional(),
 })

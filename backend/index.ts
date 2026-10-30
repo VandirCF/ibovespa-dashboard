@@ -8,6 +8,7 @@ import { fatosRoutes } from './routes/fatos'
 import { indicadoresRoutes } from './routes/indicadores'
 import { adminRoutes } from './routes/admin'
 import { iniciarColeta } from './jobs/coletaHistorico'
+import { iniciarAtualizacaoCotacoes } from './jobs/atualizaCotacoes'
 import { Sentry, deveIgnorarErro, iniciarSentry } from './lib/sentry'
 
 /** Limite de requisições por IP na API pública (PRD 4.3). */
@@ -68,6 +69,7 @@ async function main(): Promise<void> {
   const app = await criarServidor()
   await app.listen({ port: env.PORT, host: '0.0.0.0' })
   await iniciarColeta()
+  await iniciarAtualizacaoCotacoes()
 }
 
 if (require.main === module) {

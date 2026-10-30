@@ -10,12 +10,12 @@ export interface AtivoPreco {
   nome: string
   /** Preço atual em reais. */
   preco: number
-  /** Variação do dia em reais. */
-  variacao: number
-  /** Variação do dia em percentual (2.45 = +2,45%). */
-  variacaoPercent: number
-  /** Volume negociado no dia. */
-  volume: number
+  /** Variação do dia em reais. Null quando a fonte só traz o último fechamento. */
+  variacao: number | null
+  /** Variação do dia em percentual (2.45 = +2,45%). Null quando indisponível. */
+  variacaoPercent: number | null
+  /** Volume negociado no dia. Null quando indisponível. */
+  volume: number | null
   /** Valor de mercado em reais, quando disponível. */
   marketCap: number | null
   /** Setor em pt-BR (vem do cadastro local de ativos). */
@@ -105,6 +105,8 @@ export interface Indicadores {
   liquidezSeca: number | null
   /** Crescimento da receita nos últimos 12 meses, em percentual. */
   crescimentoReceita: number | null
+  /** Crescimento médio anual da receita nos últimos 5 anos, em percentual. */
+  crescimentoReceita5a: number | null
   /** Crescimento do lucro nos últimos 12 meses, em percentual. */
   crescimentoLucro: number | null
   /** LPA (Lucro por Ação) em reais. */

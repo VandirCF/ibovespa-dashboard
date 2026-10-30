@@ -42,9 +42,11 @@ indicadores fundamentalistas.
 ├── backend/                    # Fastify 4 — package.json próprio
 │   ├── index.ts                # entry point (CORS, rate limit, error handler, rotas)
 │   ├── routes/                 # ativos.ts, graficos.ts, fatos.ts, indicadores.ts, admin.ts
-│   ├── services/               # brapiService, yahooService, historicoService, fatosService, indicadoresService
-│   ├── lib/                    # cache.ts, db.ts, env.ts, logger.ts, tickers.ts, ativos-ibovespa.ts, sentry.ts
-│   ├── jobs/                   # coletaHistorico.ts (workers BullMQ)
+│   ├── services/               # brapiService, yahooService, statusInvestService, fundamentusService,
+│   │                           # historicoService, fatosService, indicadoresService
+│   ├── lib/                    # cache.ts, db.ts, env.ts, logger.ts, tickers.ts, ativos-ibovespa.ts, sentry.ts,
+│   │                           # throttle.ts (intervalo de 1s entre requisições de scraping)
+│   ├── jobs/                   # coletaHistorico.ts (coleta diária), atualizaCotacoes.ts (cotações a cada 5 min)
 │   ├── scripts/                # triggerColeta.ts
 │   ├── types/                  # tipos compartilhados do backend (espelham frontend/types)
 │   ├── prisma/                 # schema.prisma, migrations/, seed.ts
@@ -182,14 +184,17 @@ Ao exibir uma abreviatura, escreva-a com o significado por extenso, ex.: `P/L (P
 | Dado | Chave Redis | TTL | Motivo |
 |---|---|---|---|
 | Preço atual (brapi) | `preco:{ticker}` | 300s | Mercado atualiza a cada 1 min |
+| Cotações em segundo plano (Status Invest) | `cotacao-bg:{ticker}` | 600s | Job a cada 5 min (dias úteis, 10h–18h); traz variação do dia |
 | Lista IBovespa | `lista:ibovespa` | 300s | Composição muda raramente |
 | Histórico 1D/1S | `hist:{ticker}:1d` | 300s | Intraday muda com frequência |
 | Histórico 1M/3M | `hist:{ticker}:1m` | 1800s | Muda menos durante o dia |
 | Histórico 1A/5A | `hist:{ticker}:1y` | 3600s | Dados históricos são estáveis |
 | Fatos relevantes | `fatos:{ticker}` | 3600s | B3 publica algumas vezes ao dia |
 | Indicadores fundamentalistas | `fund:{ticker}` | 86400s | Dados trimestrais |
-| Último valor bom | `ultimo:{ticker}` | 86400s | Exibido quando brapi e Yahoo falham |
-| Brapi sem acesso | `brapi-sem-acesso:{ticker}` | 21600s | Plano sem o ativo: pula a brapi e usa Yahoo |
+| Tabela do Fundamentus (todos os papéis) | `fundamentus:tabela` | 3600s | Atualizada ao longo do dia; uma requisição cobre todos os papéis |
+| Detalhe do papel no Fundamentus | `fundamentus:detalhe:{ticker}` | 86400s | Valor de mercado e nº de ações mudam pouco |
+| Último valor bom | `ultimo:{ticker}` | 86400s | Exibido quando todas as fontes de cotação falham |
+| Brapi sem acesso | `brapi-sem-acesso:{ticker}` | 21600s | Plano sem o ativo: pula a brapi e segue a cadeia de cotação |
 
 ---
 
@@ -233,6 +238,38 @@ GET /quote/list?sortBy=market_cap_basic&limit=50&token=X  // Lista IBovespa
 GET /quote/{ticker}?modules=defaultKeyStatistics,financialData,balanceSheetHistory&token=X
 // Módulos acima: indicadores fundamentalistas (cache de 24h em fund:{ticker})
 // Módulos disponíveis dependem do plano: summaryDetail não é liberado no plano atual.
+```
+
+### Ordem das fontes de cotação
+
+```typescript
+// Cotação individual (getPrecoAtivo) e lista IBovespa (getListaIbovespa):
+// 1. brapi (cotação atual, com variação do dia)
+// 2. Status Invest (cotação atual e variação do dia). A lista usa o cache do job de segundo plano
+//    (cotacao-bg:{ticker}); o detalhe consulta a página do ativo quando o job ainda não tem o dado.
+// 3. Yahoo Finance (lote; sujeito a limite de requisições)
+// 4. Fundamentus (fechamento do último pregão: sem variação nem volume)
+// 5. Último valor bom (ultimo:{ticker})
+// Campos sem fonte viram null e são exibidos como "—". Nunca inventar valores.
+```
+
+### Fundamentus (indicadores e fallback de cotação)
+
+```typescript
+// Tabela: https://www.fundamentus.com.br/resultado.php (todos os papéis, uma requisição)
+// Detalhe: https://www.fundamentus.com.br/detalhes.php?papel={ticker} (valor de mercado, nº de ações)
+// Página em ISO-8859-1: decodificar antes de ler. Números no formato pt-BR.
+// Zero em múltiplos e margens significa "não se aplica" (ex.: bancos): vira null.
+// Dividend yield e crescimento aceitam zero como valor real.
+```
+
+### Status Invest (cotação com variação do dia)
+
+```typescript
+// Página: https://statusinvest.com.br/acoes/{ticker}
+// Preço: div[title="Valor atual do ativo"] strong.value
+// Variação: span[title="Variação do valor do ativo com base no dia anterior"] b
+// O sinal vem do ícone: arrow_downward = queda. Respeitar o intervalo de 1s (lib/throttle.ts).
 ```
 
 ### Yahoo Finance (histórico OHLCV)

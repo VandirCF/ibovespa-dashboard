@@ -5,9 +5,15 @@ import { FUNDAMENTUS_TTL, cache } from '../lib/cache'
 import { env } from '../lib/env'
 import { logger } from '../lib/logger'
 import { normalizarTicker } from '../lib/tickers'
+import {
+  getDetalheFundamentus,
+  getTabelaFundamentus,
+  type DetalheFundamentus,
+  type LinhaFundamentus,
+} from './fundamentusService'
 
 const URL_BRAPI = 'https://brapi.dev/api/quote'
-/** Módulos da brapi usados no cálculo. Liberados no plano atual. */
+/** Módulos da brapi usados como complemento. Liberados no plano atual. */
 const MODULOS = 'defaultKeyStatistics,financialData,balanceSheetHistory'
 const TIMEOUT_MS = 10_000
 
@@ -69,6 +75,14 @@ const RespostaBrapiSchema = z.object({ results: z.array(ResultadoBrapiSchema) })
 
 type ResultadoBrapi = z.infer<typeof ResultadoBrapiSchema>
 
+/** Dados coletados de todas as fontes para montar os indicadores de um ativo. */
+interface FontesIndicadores {
+  brapi: ResultadoBrapi | null
+  patrimonio: number | null
+  fundamentus: LinhaFundamentus | undefined
+  detalhe: DetalheFundamentus | null
+}
+
 /**
  * Multiplica uma fração (0.25) por 100 para obter percentual (25). Preserva null.
  * @param fracao Valor em fração.
@@ -94,6 +108,15 @@ function dividir(
 }
 
 /**
+ * Usa o primeiro valor disponível entre as fontes, na ordem recebida.
+ * @param valores Valores candidatos, do preferido ao reserva.
+ * @returns Primeiro valor não nulo ou null.
+ */
+function primeiro(...valores: (number | null | undefined)[]): number | null {
+  return valores.find((valor): valor is number => valor !== null && valor !== undefined) ?? null
+}
+
+/**
  * Extrai o patrimônio líquido do exercício mais recente do balanço.
  * A brapi pode devolver uma lista direta ou um objeto com `balanceSheetStatements`.
  * @param balanco Valor bruto do módulo balanceSheetHistory.
@@ -116,22 +139,26 @@ export function patrimonioLiquido(balanco: unknown): number | null {
 }
 
 /**
- * Monta os indicadores fundamentalistas a partir dos dados da brapi.
- * Razões e rendimentos vêm em fração e viram percentual. Índices sem denominador válido ficam null.
+ * Monta os indicadores de um ativo. A fonte principal é o Fundamentus (cobre quase todos os papéis
+ * do IBovespa); a brapi completa o que o Fundamentus não traz. Campos sem fonte ficam null.
+ * Razões e rendimentos da brapi vêm em fração e viram percentual; os do Fundamentus já vêm em percentual.
  * @param ticker Ticker normalizado.
- * @param resultado Dados da brapi para o ativo.
- * @param patrimonio Patrimônio líquido do exercício mais recente.
+ * @param fontes Dados coletados de cada fonte.
  * @returns Indicadores do ativo.
  */
-export function montarIndicadores(
-  ticker: string,
-  resultado: ResultadoBrapi | null,
-  patrimonio: number | null,
-): Indicadores {
-  const dks = resultado?.defaultKeyStatistics ?? null
-  const fd = resultado?.financialData ?? null
-  const valorMercado = resultado?.marketCap ?? null
+export function montarIndicadores(ticker: string, fontes: FontesIndicadores): Indicadores {
+  const dks = fontes.brapi?.defaultKeyStatistics ?? null
+  const fd = fontes.brapi?.financialData ?? null
+  const fund = fontes.fundamentus
+  const cotacao = fund?.cotacao ?? null
+  const nroAcoes = fontes.detalhe?.nroAcoes ?? null
 
+  const marketCap = primeiro(
+    fontes.brapi?.marketCap,
+    fontes.detalhe?.marketCap,
+    cotacao !== null && nroAcoes !== null ? cotacao * nroAcoes : null,
+  )
+  const pl = primeiro(fund?.pl, fontes.brapi?.priceEarnings)
   const dividaLiquida =
     fd?.totalDebt !== undefined &&
     fd?.totalDebt !== null &&
@@ -139,31 +166,35 @@ export function montarIndicadores(
     fd?.totalCash !== null
       ? fd.totalDebt - fd.totalCash
       : null
+  const patrimonio = primeiro(fund?.patrimonioLiquido, fontes.patrimonio)
+  const lpaCalculado = dividir(cotacao, pl)
+  const vpaCalculado = dividir(cotacao, fund?.pvp)
 
   return {
     ticker,
-    marketCap: valorMercado,
-    pl: resultado?.priceEarnings ?? null,
-    pvp: dks?.priceToBook ?? null,
-    evEbitda: dks?.enterpriseToEbitda ?? null,
+    marketCap,
+    pl,
+    pvp: primeiro(fund?.pvp, dks?.priceToBook),
+    evEbitda: primeiro(fund?.evEbitda, dks?.enterpriseToEbitda),
     evReceita: dks?.enterpriseToRevenue ?? null,
     peg: dks?.pegRatio ?? null,
-    dividendYield: percentual(dks?.dividendYield),
-    fcfYield: percentual(dividir(fd?.freeCashflow, valorMercado)),
-    roe: percentual(fd?.returnOnEquity),
+    dividendYield: primeiro(fund?.dividendYield, percentual(dks?.dividendYield)),
+    fcfYield: percentual(dividir(fd?.freeCashflow, marketCap)),
+    roe: primeiro(fund?.roe, percentual(fd?.returnOnEquity)),
     roa: percentual(fd?.returnOnAssets),
-    margemBruta: percentual(fd?.grossMargins),
+    margemBruta: primeiro(fund?.margemBruta, percentual(fd?.grossMargins)),
     margemEbitda: percentual(fd?.ebitdaMargins),
-    margemOperacional: percentual(fd?.operatingMargins),
-    margemLiquida: percentual(fd?.profitMargins),
+    margemOperacional: primeiro(fund?.margemEbit, percentual(fd?.operatingMargins)),
+    margemLiquida: primeiro(fund?.margemLiquida, percentual(fd?.profitMargins)),
     dividaLiquidaEbitda: dividir(dividaLiquida, fd?.ebitda),
-    dividaLiquidaPl: dividir(dividaLiquida, patrimonio),
-    liquidezCorrente: fd?.currentRatio ?? null,
+    dividaLiquidaPl: primeiro(fund?.dividaLiquidaPl, dividir(dividaLiquida, patrimonio)),
+    liquidezCorrente: primeiro(fund?.liquidezCorrente, fd?.currentRatio),
     liquidezSeca: fd?.quickRatio ?? null,
     crescimentoReceita: percentual(fd?.revenueGrowth),
+    crescimentoReceita5a: fund?.crescimentoReceita5a ?? null,
     crescimentoLucro: percentual(fd?.earningsGrowth),
-    lpa: dks?.trailingEps ?? resultado?.earningsPerShare ?? null,
-    vpa: dks?.bookValue ?? null,
+    lpa: primeiro(dks?.trailingEps, fontes.brapi?.earningsPerShare, lpaCalculado),
+    vpa: primeiro(dks?.bookValue, vpaCalculado),
     beta: dks?.beta ?? null,
   }
 }
@@ -171,7 +202,7 @@ export function montarIndicadores(
 /**
  * Busca os módulos fundamentalistas do ativo na brapi.
  * @param ticker Ticker normalizado, ex.: PETR4.
- * @returns Primeiro resultado da resposta ou null em caso de erro.
+ * @returns Resultado da brapi e patrimônio líquido, ou null em caso de erro.
  */
 async function buscarFundamentosBrapi(ticker: string): Promise<{
   resultado: ResultadoBrapi
@@ -208,8 +239,17 @@ export async function getIndicadores(ticker: string): Promise<Indicadores> {
   const emCache = await cache.get<Indicadores>(chave)
   if (emCache !== null) return emCache
 
-  const dados = await buscarFundamentosBrapi(t)
-  const indicadores = montarIndicadores(t, dados?.resultado ?? null, dados?.patrimonio ?? null)
+  const [tabela, brapi] = await Promise.all([getTabelaFundamentus(), buscarFundamentosBrapi(t)])
+  const fundamentus = tabela.get(t)
+  // Valor de mercado: só consulta o detalhe do Fundamentus se a brapi não o tiver.
+  const detalhe = brapi?.resultado.marketCap == null ? await getDetalheFundamentus(t) : null
+
+  const indicadores = montarIndicadores(t, {
+    brapi: brapi?.resultado ?? null,
+    patrimonio: brapi?.patrimonio ?? null,
+    fundamentus,
+    detalhe,
+  })
 
   const algumPreenchido = Object.entries(indicadores).some(
     ([campo, valor]) => campo !== 'ticker' && valor !== null,

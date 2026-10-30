@@ -1,11 +1,12 @@
 # PRD — IBovespa Dashboard
 
-**Versão:** 1.1  
+**Versão:** 1.2  
 **Data:** Outubro 2026  
 **Status:** Em desenvolvimento (MVP, fatos relevantes e indicadores entregues; deploy pendente)  
 **Responsável:** A definir
 
 **Histórico de versões**
+- **1.2 (Outubro 2026):** job em segundo plano atualiza a variação do dia de todos os ativos a cada 5 minutos (dias úteis, 10h–18h). Cotações e indicadores passam a ter fontes de reserva: Fundamentus (indicadores de 45 dos 50 ativos e fechamento) e Status Invest (cotação e variação do dia). A lista deixa de depender só da brapi e do Yahoo e passa de 4 para 45 ativos.
 - **1.1 (Outubro 2026):** recomendação por IA removida do escopo (cada análise consome tokens); painel de indicadores fundamentalistas ampliado e passa a usar a brapi como fonte; Alpha Vantage e Claude API removidas das fontes; fases atualizadas ao estado real do projeto.
 - **1.0 (Abril 2026):** versão inicial.
 
@@ -156,9 +157,13 @@ Regras:
 
 | Fonte | Dados | Observações |
 |---|---|---|
-| brapi.dev | Preços em tempo real, lista IBovespa, indicadores fundamentalistas | API REST com token; alguns módulos dependem do plano |
+| brapi.dev | Cotações, lista IBovespa e indicadores complementares | API REST com token; alguns ativos e módulos dependem do plano |
+| Fundamentus | Indicadores fundamentalistas de todos os papéis; fechamento do último pregão | Scraping com delay de 1s; cobre 45 dos 50 ativos do IBovespa |
+| Status Invest | Cotação atual e variação do dia | Scraping com delay de 1s; job a cada 5 min em dias úteis, 10h–18h |
 | yahoo-finance2 (npm) | Histórico OHLCV | Gratuito, sem autenticação; sujeito a limite de requisições |
-| B3 / Investidor10 | Fatos relevantes | Scraping controlado, com delay de 1s entre requisições |
+| Investidor10 | Fatos relevantes (comunicados) | Scraping controlado, com delay de 1s entre requisições |
+
+**Fontes não usadas como dado:** a planilha do Google Sheets baseada no GOOGLEFINANCE (não resolve parte dos papéis da B3, traz `#N/A` e valores em ARS de CEDEARs, e é privada) e a página "Para você" da B3 (conteúdo educacional, sem dados de mercado).
 
 ### 5.3 MCPs recomendados (Claude Code)
 
@@ -244,7 +249,8 @@ Regras:
 - [x] Monitoramento com Sentry configurado no código (ativa com DSN)
 - [ ] Criar contas e cadastrar segredos (Vercel, Railway, Sentry)
 - [ ] Medir Core Web Vitals no PageSpeed Insights (mobile)
-- [ ] Teste E2E da home estável (depende de dados ao vivo da brapi e do Yahoo)
+- [x] Teste E2E da home estável (lista com fallback no Fundamentus e no Status Invest)
+- [ ] Histórico de candles para os ativos fora da brapi (hoje depende do Yahoo, que limita requisições)
 
 ---
 

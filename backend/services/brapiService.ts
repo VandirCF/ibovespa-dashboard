@@ -6,6 +6,8 @@ import { PRECO_TTL, cache } from '../lib/cache'
 import { env } from '../lib/env'
 import { logger } from '../lib/logger'
 import { normalizarTicker } from '../lib/tickers'
+import { getTabelaFundamentus, type LinhaFundamentus } from './fundamentusService'
+import { buscarCotacaoStatusInvest, chaveCotacaoBackground } from './statusInvestService'
 import { getCotacoesYahoo, getPrecoYahoo } from './yahooService'
 
 /** Cotações buscadas em sequência na brapi, para não estourar o limite de requisições simultâneas. */
@@ -147,13 +149,51 @@ async function obterCotacaoFresca(ticker: string): Promise<AtivoPreco | null> {
     await registrarUltimoValor(daBrapi)
     return daBrapi
   }
+
+  const daBackground = await cache.get<AtivoPreco>(chaveCotacaoBackground(ticker))
+  if (daBackground) return daBackground
+
+  const daStatusInvest = await buscarCotacaoStatusInvest(ticker)
+  if (daStatusInvest) {
+    await registrarUltimoValor(daStatusInvest)
+    return daStatusInvest
+  }
+
   try {
     const doYahoo = await getPrecoYahoo(ticker)
-    if (doYahoo) await registrarUltimoValor(doYahoo)
-    return doYahoo
+    if (doYahoo) {
+      await registrarUltimoValor(doYahoo)
+      return doYahoo
+    }
   } catch (erro: unknown) {
     logger.error({ err: erro, ticker }, 'Falha no Yahoo Finance para o ativo')
-    return null
+  }
+
+  const doFundamentus = cotacaoDoFundamentus(ticker, (await getTabelaFundamentus()).get(ticker))
+  if (doFundamentus) await registrarUltimoValor(doFundamentus)
+  return doFundamentus
+}
+
+/**
+ * Converte a linha do Fundamentus em cotação. A fonte traz só o fechamento do último pregão,
+ * então variação e volume ficam nulos.
+ * @param ticker Ticker normalizado.
+ * @param linha Linha do ticker na tabela do Fundamentus, se existir.
+ * @returns Cotação de fechamento ou null.
+ */
+function cotacaoDoFundamentus(
+  ticker: string,
+  linha: LinhaFundamentus | undefined,
+): AtivoPreco | null {
+  if (!linha || linha.cotacao === null) return null
+  return {
+    ticker,
+    nome: ticker,
+    preco: linha.cotacao,
+    variacao: null,
+    variacaoPercent: null,
+    volume: null,
+    marketCap: null,
   }
 }
 
@@ -207,6 +247,22 @@ export async function getListaIbovespa(): Promise<AtivoPreco[]> {
           { err: erro, total: faltantes.length },
           'Falha no lote do Yahoo; usando último valor conhecido',
         )
+      }
+    }
+
+    // Cotação com variação mantida pelo job de segundo plano (Status Invest).
+    for (const t of tickers.filter((ticker) => !frescos.has(ticker))) {
+      const daBackground = await cache.get<AtivoPreco>(chaveCotacaoBackground(t))
+      if (daBackground) frescos.set(t, daBackground)
+    }
+
+    // Último recurso: fechamento do Fundamentus, sem variação.
+    const semCotacao = tickers.filter((t) => !frescos.has(t))
+    if (semCotacao.length > 0) {
+      const tabela = await getTabelaFundamentus()
+      for (const t of semCotacao) {
+        const doFundamentus = cotacaoDoFundamentus(t, tabela.get(t))
+        if (doFundamentus) frescos.set(t, doFundamentus)
       }
     }
 

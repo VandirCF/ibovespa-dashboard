@@ -27,6 +27,7 @@ const IndicadoresSchema = z.object({
   liquidezCorrente: numeroOuNulo,
   liquidezSeca: numeroOuNulo,
   crescimentoReceita: numeroOuNulo,
+  crescimentoReceita5a: numeroOuNulo,
   crescimentoLucro: numeroOuNulo,
   lpa: numeroOuNulo,
   vpa: numeroOuNulo,

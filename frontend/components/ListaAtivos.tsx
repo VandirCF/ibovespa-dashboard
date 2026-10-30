@@ -52,8 +52,33 @@ function ordenar(ativos: readonly AtivoPreco[], ordenacao: Ordenacao): AtivoPrec
     if (campo === 'setor') {
       return (a.setor ?? '').localeCompare(b.setor ?? '', 'pt-BR') * fator
     }
-    return (a[campo] - b[campo]) * fator
+    const valorA = a[campo]
+    const valorB = b[campo]
+    // Sem dado: a linha vai para o fim, em qualquer direção.
+    if (valorA === null || valorB === null) {
+      if (valorA === valorB) return 0
+      return valorA === null ? 1 : -1
+    }
+    return (valorA - valorB) * fator
   })
+}
+
+/**
+ * Texto da variação percentual, ou traço quando a fonte não a informa.
+ * @param percentual Variação em percentual ou null.
+ * @returns Texto formatado ou "—".
+ */
+function textoVariacao(percentual: number | null): string {
+  return percentual === null ? '—' : formatarVariacao(percentual)
+}
+
+/**
+ * Texto do volume, ou traço quando a fonte não o informa.
+ * @param volume Volume negociado ou null.
+ * @returns Texto compacto ou "—".
+ */
+function textoVolume(volume: number | null): string {
+  return volume === null ? '—' : formatarVolume(volume)
 }
 
 /**
@@ -61,7 +86,8 @@ function ordenar(ativos: readonly AtivoPreco[], ordenacao: Ordenacao): AtivoPrec
  * @param percentual Variação percentual do dia.
  * @returns Classe Tailwind.
  */
-function classeVariacao(percentual: number): string {
+function classeVariacao(percentual: number | null): string {
+  if (percentual === null) return 'text-slate-400'
   if (percentual > 0) return 'text-alta'
   if (percentual < 0) return 'text-baixa'
   return 'text-slate-400'
@@ -183,10 +209,10 @@ export default function ListaAtivos({
               <td
                 className={`px-3 py-2 text-right font-medium tabular-nums ${classeVariacao(ativo.variacaoPercent)}`}
               >
-                {formatarVariacao(ativo.variacaoPercent)}
+                {textoVariacao(ativo.variacaoPercent)}
               </td>
               <td className="hidden px-3 py-2 text-right tabular-nums text-slate-300 sm:table-cell">
-                {formatarVolume(ativo.volume)}
+                {textoVolume(ativo.volume)}
               </td>
               <td className="hidden px-3 py-2 text-slate-400 lg:table-cell">
                 {ativo.setor ?? '—'}
