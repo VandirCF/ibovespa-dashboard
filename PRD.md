@@ -1,11 +1,12 @@
 # PRD — IBovespa Dashboard
 
-**Versão:** 1.2  
+**Versão:** 1.3  
 **Data:** Outubro 2026  
 **Status:** Em desenvolvimento (MVP, fatos relevantes e indicadores entregues; deploy pendente)  
 **Responsável:** A definir
 
 **Histórico de versões**
+- **1.3 (Outubro 2026):** cadastro de ações revisado (CCRO3 → MOTV3, ELET3 → AXIA3, EMBR3 → EMBJ3, MRFG3 → MBRF3 e NUBR33 → VBBR3), com os 50 ativos cobertos pelas fontes; fundos imobiliários entram no escopo, separados das ações por um seletor na home; a coluna de volume vira liquidez média diária (Fundamentus) para todos os ativos; fora do pregão, o app mostra o fechamento do último pregão com a data.
 - **1.2 (Outubro 2026):** job em segundo plano atualiza a variação do dia de todos os ativos a cada 5 minutos (dias úteis, 10h–18h). Cotações e indicadores passam a ter fontes de reserva: Fundamentus (indicadores de 45 dos 50 ativos e fechamento) e Status Invest (cotação e variação do dia). A lista deixa de depender só da brapi e do Yahoo e passa de 4 para 45 ativos.
 - **1.1 (Outubro 2026):** recomendação por IA removida do escopo (cada análise consome tokens); painel de indicadores fundamentalistas ampliado e passa a usar a brapi como fonte; Alpha Vantage e Claude API removidas das fontes; fases atualizadas ao estado real do projeto.
 - **1.0 (Abril 2026):** versão inicial.
@@ -101,6 +102,15 @@ Regras:
 
 **Critério de aceite:** Os indicadores são carregados em menos de 3 segundos e atualizados a cada 24 horas.
 
+### 3.6 Fundos imobiliários
+
+- Seletor na home entre "Ações (IBovespa)" e "Fundos imobiliários"; a escolha fica na URL (`?tipo=fii`).
+- Lista dos 50 FIIs mais líquidos (Fundamentus), com preço, variação do dia, liquidez média e segmento.
+- Tela de detalhe com cotação, gráfico, comunicados e indicadores próprios de FII: dividend yield, P/VP, FFO yield, cap rate, vacância, número de imóveis, preço e aluguel por m² e liquidez.
+- A busca encontra ações e fundos.
+
+**Critério de aceite:** A lista de FIIs mostra ao menos 10 fundos e mantém a seleção após recarregar a página.
+
 ---
 
 ## 4. Requisitos não funcionais
@@ -158,7 +168,7 @@ Regras:
 | Fonte | Dados | Observações |
 |---|---|---|
 | brapi.dev | Cotações, lista IBovespa e indicadores complementares | API REST com token; alguns ativos e módulos dependem do plano |
-| Fundamentus | Indicadores fundamentalistas de todos os papéis; fechamento do último pregão | Scraping com delay de 1s; cobre 45 dos 50 ativos do IBovespa |
+| Fundamentus | Indicadores de ações e de FIIs; liquidez média diária; fechamento e histórico diário | Scraping com delay de 1s; cobre os 50 ativos do cadastro e cerca de 570 FIIs |
 | Status Invest | Cotação atual e variação do dia | Scraping com delay de 1s; job a cada 5 min em dias úteis, 10h–18h |
 | yahoo-finance2 (npm) | Histórico OHLCV | Gratuito, sem autenticação; sujeito a limite de requisições |
 | Investidor10 | Fatos relevantes (comunicados) | Scraping controlado, com delay de 1s entre requisições |
@@ -191,7 +201,7 @@ Regras:
 - Autenticação e carteira personalizada
 - Alertas de preço por e-mail ou push
 - Comparação entre múltiplos ativos no mesmo gráfico
-- Dados de opções, BDRs e FIIs
+- Dados de opções e BDRs
 - Backtesting de estratégias
 - App mobile nativo
 - Integração com corretoras
@@ -250,7 +260,9 @@ Regras:
 - [ ] Criar contas e cadastrar segredos (Vercel, Railway, Sentry)
 - [ ] Medir Core Web Vitals no PageSpeed Insights (mobile)
 - [x] Teste E2E da home estável (lista com fallback no Fundamentus e no Status Invest)
-- [ ] Histórico de candles para os ativos fora da brapi (hoje depende do Yahoo, que limita requisições)
+- [x] Histórico para os ativos fora da brapi: série diária de fechamentos do Fundamentus como reserva do Yahoo
+- [x] Fora do pregão, exibir o fechamento do último pregão com a data
+- [ ] Candles completos (abertura, máxima, mínima e volume) e intradiário para os ativos fora da brapi
 
 ---
 

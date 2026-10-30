@@ -4,10 +4,16 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, type MouseEvent } from 'react'
 import type { AtivoPreco } from '@/types'
-import { formatarMoeda, formatarVariacao, formatarVolume } from '@/lib/formatters'
+import {
+  ehDeOutroDia,
+  formatarDataCurta,
+  formatarMoeda,
+  formatarVariacao,
+  formatarVolume,
+} from '@/lib/formatters'
 
 /** Campos ordenáveis da tabela. */
-type Campo = 'ticker' | 'nome' | 'preco' | 'variacaoPercent' | 'volume' | 'setor'
+type Campo = 'ticker' | 'nome' | 'preco' | 'variacaoPercent' | 'liquidez' | 'setor'
 
 interface Ordenacao {
   campo: Campo
@@ -23,6 +29,8 @@ interface PropsListaAtivos {
   erro: boolean
   /** Ação do botão "Tentar novamente". */
   onTentarNovamente: () => void
+  /** Rótulo da última coluna: "Setor" para ações, "Segmento" para fundos imobiliários. */
+  rotuloSetor?: string
 }
 
 /** Colunas da tabela, na ordem de exibição. */
@@ -33,8 +41,8 @@ const COLUNAS: { campo: Campo; rotulo: string; alinhamento: 'left' | 'right'; cl
     { campo: 'preco', rotulo: 'Preço (R$)', alinhamento: 'right' },
     { campo: 'variacaoPercent', rotulo: 'Variação (%)', alinhamento: 'right' },
     {
-      campo: 'volume',
-      rotulo: 'Volume (R$)',
+      campo: 'liquidez',
+      rotulo: 'Liquidez média (R$/dia)',
       alinhamento: 'right',
       classe: 'hidden sm:table-cell',
     },
@@ -78,12 +86,12 @@ function textoVariacao(percentual: number | null): string {
 }
 
 /**
- * Texto do volume, ou traço quando a fonte não o informa.
- * @param volume Volume negociado ou null.
- * @returns Texto compacto ou "—".
+ * Texto da liquidez média diária, ou traço quando a fonte não a informa.
+ * @param liquidez Liquidez em reais ou null.
+ * @returns Texto compacto (ex.: "2,54 bi") ou "—".
  */
-function textoVolume(volume: number | null): string {
-  return volume === null ? '—' : formatarVolume(volume)
+function textoLiquidez(liquidez: number | null): string {
+  return liquidez === null ? '—' : formatarVolume(liquidez)
 }
 
 /**
@@ -99,8 +107,9 @@ function classeVariacao(percentual: number | null): string {
 }
 
 /**
- * Tabela de ativos do IBovespa com ordenação por coluna, skeleton, erro com retry e linhas clicáveis.
- * @param props Dados, estados de carga/erro e ação de retry.
+ * Tabela de ativos (ações ou fundos imobiliários) com ordenação por coluna, skeleton,
+ * erro com retry e linhas clicáveis.
+ * @param props Dados, estados de carga/erro, ação de retry e rótulo da coluna de setor.
  * @returns Tabela responsiva.
  */
 export default function ListaAtivos({
@@ -108,6 +117,7 @@ export default function ListaAtivos({
   carregando,
   erro,
   onTentarNovamente,
+  rotuloSetor = 'Setor',
 }: PropsListaAtivos) {
   const router = useRouter()
   const [ordenacao, setOrdenacao] = useState<Ordenacao>({
@@ -182,7 +192,7 @@ export default function ListaAtivos({
                     onClick={() => alternarOrdenacao(coluna.campo)}
                     className="inline-flex items-center gap-1 hover:text-slate-100"
                   >
-                    {coluna.rotulo}
+                    {coluna.campo === 'setor' ? rotuloSetor : coluna.rotulo}
                     <span aria-hidden="true">
                       {ativa ? (ordenacao.direcao === 'asc' ? '▲' : '▼') : ''}
                     </span>
@@ -210,14 +220,21 @@ export default function ListaAtivos({
               <td className="hidden max-w-[16rem] truncate px-3 py-2 text-slate-300 md:table-cell">
                 {ativo.nome}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">{formatarMoeda(ativo.preco)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {formatarMoeda(ativo.preco)}
+                {ativo.atualizadoEm && ehDeOutroDia(new Date(ativo.atualizadoEm)) && (
+                  <span className="block text-xs text-slate-500">
+                    fech. {formatarDataCurta(new Date(ativo.atualizadoEm))}
+                  </span>
+                )}
+              </td>
               <td
                 className={`px-3 py-2 text-right font-medium tabular-nums ${classeVariacao(ativo.variacaoPercent)}`}
               >
                 {textoVariacao(ativo.variacaoPercent)}
               </td>
               <td className="hidden px-3 py-2 text-right tabular-nums text-slate-300 sm:table-cell">
-                {textoVolume(ativo.volume)}
+                {textoLiquidez(ativo.liquidez)}
               </td>
               <td className="hidden px-3 py-2 text-slate-400 lg:table-cell">
                 {ativo.setor ?? '—'}

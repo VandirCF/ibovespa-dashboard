@@ -5,6 +5,7 @@ import { CATEGORIAS_FATO, type CategoriaFato, type Fato } from '../types'
 import { cache } from '../lib/cache'
 import { logger } from '../lib/logger'
 import { normalizarTicker } from '../lib/tickers'
+import { ehFii } from './fundamentusService'
 
 /** TTL dos comunicados no cache, em segundos (B3 publica algumas vezes ao dia). */
 export const FATOS_TTL = 3600
@@ -12,7 +13,7 @@ export const FATOS_TTL = 3600
 /** Intervalo mínimo entre requisições ao Investidor10, em milissegundos. */
 const DELAY_SCRAPING_MS = 1000
 
-const URL_BASE_INVESTIDOR10 = 'https://investidor10.com.br/acoes'
+const URL_BASE_INVESTIDOR10 = 'https://investidor10.com.br'
 const USER_AGENT = 'IBovespa-Dashboard/1.0'
 const TIMEOUT_MS = 10_000
 
@@ -118,11 +119,14 @@ export function extrairFatosDoHtml(html: string): Fato[] {
 /**
  * Baixa a página do ativo no Investidor10 e extrai os comunicados.
  * @param ticker Ticker normalizado, ex.: PETR4.
+ * @param fii true para fundo imobiliário (página `/fiis/`), false para ação (`/acoes/`).
  * @returns Comunicados extraídos.
  * @throws Erro de rede ou HTTP (inclui 403/429, que indicam bloqueio).
  */
-async function baixarFatos(ticker: string): Promise<Fato[]> {
-  const resposta = await axios.get<string>(`${URL_BASE_INVESTIDOR10}/${ticker.toLowerCase()}/`, {
+async function baixarFatos(ticker: string, fii: boolean): Promise<Fato[]> {
+  const caminho = fii ? 'fiis' : 'acoes'
+  const url = `${URL_BASE_INVESTIDOR10}/${caminho}/${ticker.toLowerCase()}/`
+  const resposta = await axios.get<string>(url, {
     headers: { 'User-Agent': USER_AGENT },
     timeout: TIMEOUT_MS,
     responseType: 'text',
@@ -176,7 +180,8 @@ export async function getFatos(
   let todos = await cache.get<Fato[]>(chave)
   if (todos === null) {
     try {
-      todos = await executarComDelay(() => baixarFatos(t))
+      const fii = await ehFii(t)
+      todos = await executarComDelay(() => baixarFatos(t, fii))
     } catch (erro: unknown) {
       logger.error({ err: erro, ticker: t }, 'Falha ao buscar comunicados no Investidor10')
       return []

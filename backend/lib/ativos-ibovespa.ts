@@ -11,6 +11,8 @@ export interface AtivoIbovespa {
 /**
  * 50 principais ativos do IBovespa. Fonte da lista exibida pela API e do seed do banco.
  * A composição muda a cada quadrimestre: conferir na composição oficial da B3 antes de produção.
+ * Revisão de outubro de 2026: CCRO3 → MOTV3 (Motiva), ELET3 → AXIA3 (Axia Energia),
+ * EMBR3 → EMBJ3 (Embraer), MRFG3 → MBRF3 (MBRF) e NUBR33 (sem negociação nas fontes) → VBBR3 (Vibra).
  */
 export const ATIVOS_IBOVESPA: readonly AtivoIbovespa[] = [
   { ticker: 'VALE3', nome: 'Vale', setor: 'Materiais Básicos', subsector: 'Mineração' },
@@ -34,18 +36,17 @@ export const ATIVOS_IBOVESPA: readonly AtivoIbovespa[] = [
   { ticker: 'BPAC11', nome: 'BTG Pactual Unit', setor: 'Financeiro', subsector: 'Bancos' },
   { ticker: 'ITSA4', nome: 'Itaúsa PN', setor: 'Financeiro', subsector: 'Holdings Diversificadas' },
   { ticker: 'B3SA3', nome: 'B3', setor: 'Financeiro', subsector: 'Serviços Financeiros Diversos' },
-  {
-    ticker: 'NUBR33',
-    nome: 'Nu Holdings (BDR)',
-    setor: 'Financeiro',
-    subsector: 'Serviços Financeiros Diversos',
-  },
   { ticker: 'BBSE3', nome: 'BB Seguridade', setor: 'Financeiro', subsector: 'Seguros' },
   { ticker: 'PSSA3', nome: 'Porto Seguro', setor: 'Financeiro', subsector: 'Seguros' },
   { ticker: 'WEGE3', nome: 'WEG', setor: 'Industrial', subsector: 'Máquinas e Equipamentos' },
-  { ticker: 'EMBR3', nome: 'Embraer', setor: 'Industrial', subsector: 'Aeronáutica e Defesa' },
+  { ticker: 'EMBJ3', nome: 'Embraer', setor: 'Industrial', subsector: 'Aeronáutica e Defesa' },
   { ticker: 'RAIL3', nome: 'Rumo', setor: 'Industrial', subsector: 'Transporte Ferroviário' },
-  { ticker: 'CCRO3', nome: 'CCR', setor: 'Industrial', subsector: 'Concessões Rodoviárias' },
+  {
+    ticker: 'MOTV3',
+    nome: 'Motiva (ex-CCR)',
+    setor: 'Industrial',
+    subsector: 'Concessões de Infraestrutura',
+  },
   { ticker: 'RENT3', nome: 'Localiza', setor: 'Industrial', subsector: 'Locação de Veículos' },
   { ticker: 'ABEV3', nome: 'Ambev', setor: 'Consumo não Cíclico', subsector: 'Bebidas' },
   {
@@ -74,8 +75,8 @@ export const ATIVOS_IBOVESPA: readonly AtivoIbovespa[] = [
     subsector: 'Açúcar e Álcool',
   },
   {
-    ticker: 'MRFG3',
-    nome: 'Marfrig',
+    ticker: 'MBRF3',
+    nome: 'MBRF (Marfrig e BRF)',
     setor: 'Consumo não Cíclico',
     subsector: 'Alimentos Processados',
   },
@@ -84,8 +85,8 @@ export const ATIVOS_IBOVESPA: readonly AtivoIbovespa[] = [
   { ticker: 'FLRY3', nome: 'Fleury', setor: 'Saúde', subsector: 'Medicina Diagnóstica' },
   { ticker: 'RADL3', nome: 'RaiaDrogasil', setor: 'Saúde', subsector: 'Drogarias' },
   {
-    ticker: 'ELET3',
-    nome: 'Eletrobras ON',
+    ticker: 'AXIA3',
+    nome: 'Axia Energia (ex-Eletrobras) ON',
     setor: 'Utilidade Pública',
     subsector: 'Energia Elétrica',
   },
@@ -120,6 +121,12 @@ export const ATIVOS_IBOVESPA: readonly AtivoIbovespa[] = [
   {
     ticker: 'UGPA3',
     nome: 'Ultrapar',
+    setor: 'Petróleo e Gás',
+    subsector: 'Distribuição de Combustíveis',
+  },
+  {
+    ticker: 'VBBR3',
+    nome: 'Vibra Energia',
     setor: 'Petróleo e Gás',
     subsector: 'Distribuição de Combustíveis',
   },

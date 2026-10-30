@@ -10,8 +10,14 @@ import ErroCarregamento from '@/components/ErroCarregamento'
 import FatosRelevantes from '@/components/FatosRelevantes'
 import GraficoCandlestick from '@/components/GraficoCandlestick'
 import Indicadores from '@/components/Indicadores'
+import IndicadoresFii from '@/components/IndicadoresFii'
 import { LISTA_REVALIDATE_SEGUNDOS } from '@/lib/constants'
-import { formatarMoeda, formatarVariacao } from '@/lib/formatters'
+import {
+  ehDeOutroDia,
+  formatarDataHoraCurta,
+  formatarMoeda,
+  formatarVariacao,
+} from '@/lib/formatters'
 import { buscarAtivoNoServidor } from '@/services/ativosService'
 
 /** Revalidação automática da página de detalhe (T-009: 300 segundos). */
@@ -142,7 +148,8 @@ export default async function DetalheAtivo({ params }: PropsDetalhe) {
     {
       id: 'indicadores',
       rotulo: 'Indicadores',
-      conteudo: <Indicadores ticker={ticker} />,
+      conteudo:
+        ativo.tipo === 'fii' ? <IndicadoresFii ticker={ticker} /> : <Indicadores ticker={ticker} />,
     },
     {
       id: 'fatos',
@@ -172,12 +179,20 @@ export default async function DetalheAtivo({ params }: PropsDetalhe) {
               ({ativo.variacao === null ? '—' : formatarMoeda(ativo.variacao)})
             </span>
           </p>
+          {ativo.atualizadoEm && ehDeOutroDia(new Date(ativo.atualizadoEm)) && (
+            <p className="mt-1 text-xs text-slate-400">
+              Fechamento de {formatarDataHoraCurta(new Date(ativo.atualizadoEm))}
+            </p>
+          )}
         </div>
       </section>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <BadgeMercado />
-        <Link href="/" className="text-sm text-slate-400 hover:text-slate-100 hover:underline">
+        <Link
+          href={ativo.tipo === 'fii' ? '/?tipo=fii' : '/'}
+          className="text-sm text-slate-400 hover:text-slate-100 hover:underline"
+        >
           ← Voltar para a lista
         </Link>
       </div>

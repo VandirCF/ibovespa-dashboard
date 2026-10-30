@@ -5,9 +5,20 @@ import { ATIVOS_IBOVESPA } from '../lib/ativos-ibovespa'
 import { PRECO_TTL, cache } from '../lib/cache'
 import { env } from '../lib/env'
 import { logger } from '../lib/logger'
+import { emHorarioDePregao } from '../lib/pregao'
 import { normalizarTicker } from '../lib/tickers'
-import { getTabelaFundamentus, type LinhaFundamentus } from './fundamentusService'
-import { buscarCotacaoStatusInvest, chaveCotacaoBackground } from './statusInvestService'
+import { cotacaoDoFii } from './fiisService'
+import {
+  ehFii,
+  getTabelaFiis,
+  getTabelaFundamentus,
+  type LinhaFundamentus,
+} from './fundamentusService'
+import {
+  buscarCotacaoStatusInvest,
+  chaveCotacaoBackground,
+  chaveFechamento,
+} from './statusInvestService'
 import { getCotacoesYahoo, getPrecoYahoo } from './yahooService'
 
 /** Cotações buscadas em sequência na brapi, para não estourar o limite de requisições simultâneas. */
@@ -36,6 +47,7 @@ const QuoteRespostaSchema = z.object({
       regularMarketChangePercent: z.number(),
       regularMarketVolume: z.number().nonnegative(),
       marketCap: z.number().nullable().optional(),
+      regularMarketTime: z.unknown().optional(),
     }),
   ),
 })
@@ -56,6 +68,17 @@ function chaveUltimoValor(ticker: string): string {
  */
 function chaveSemAcesso(ticker: string): string {
   return `brapi-sem-acesso:${ticker}`
+}
+
+/**
+ * Converte o horário da cotação informado pela brapi em ISO 8601.
+ * @param valor Campo regularMarketTime (texto ISO na brapi; outros formatos são ignorados).
+ * @returns Data ISO ou undefined se o valor não for uma data válida.
+ */
+function dataDaCotacao(valor: unknown): string | undefined {
+  if (typeof valor !== 'string') return undefined
+  const data = new Date(valor)
+  return Number.isNaN(data.getTime()) ? undefined : data.toISOString()
 }
 
 /**
@@ -86,9 +109,10 @@ export async function buscarQuoteBrapi(ticker: string): Promise<AtivoPreco | nul
       preco: q.regularMarketPrice,
       variacao: q.regularMarketChange,
       variacaoPercent: q.regularMarketChangePercent,
-      // A brapi informa quantidade de ações; o volume financeiro é estimado pelo preço atual.
-      volume: q.regularMarketVolume * q.regularMarketPrice,
+      // Liquidez média (2 meses) vem do Fundamentus na montagem da lista.
+      liquidez: null,
       marketCap: q.marketCap ?? null,
+      atualizadoEm: dataDaCotacao(q.regularMarketTime),
     }
   } catch (erro: unknown) {
     if (axios.isAxiosError(erro) && erro.response?.status === 404) return null
@@ -154,11 +178,20 @@ async function obterCotacaoFresca(ticker: string): Promise<AtivoPreco | null> {
   const daBackground = await cache.get<AtivoPreco>(chaveCotacaoBackground(ticker))
   if (daBackground) return daBackground
 
-  const daStatusInvest = await buscarCotacaoStatusInvest(ticker)
-  if (daStatusInvest) {
-    await registrarUltimoValor(daStatusInvest)
-    return daStatusInvest
+  // Durante o pregão, a página do Status Invest traz a cotação do dia. Fora dele, ela mostra o
+  // último fechamento sem data, então vale o fechamento guardado pelo job (com a data da leitura).
+  const emPregao = emHorarioDePregao()
+  const fii = await ehFii(ticker)
+  if (emPregao) {
+    const daStatusInvest = await buscarCotacaoStatusInvest(ticker, fii ? 'fii' : 'acao')
+    if (daStatusInvest) {
+      await registrarUltimoValor(daStatusInvest)
+      return daStatusInvest
+    }
   }
+
+  const fechamento = await cache.get<AtivoPreco>(chaveFechamento(ticker))
+  if (!emPregao && fechamento) return fechamento
 
   try {
     const doYahoo = await getPrecoYahoo(ticker)
@@ -170,14 +203,18 @@ async function obterCotacaoFresca(ticker: string): Promise<AtivoPreco | null> {
     logger.error({ err: erro, ticker }, 'Falha no Yahoo Finance para o ativo')
   }
 
-  const doFundamentus = cotacaoDoFundamentus(ticker, (await getTabelaFundamentus()).get(ticker))
+  if (fechamento) return fechamento
+
+  const doFundamentus = fii
+    ? cotacaoDoFii((await getTabelaFiis()).get(ticker))
+    : cotacaoDoFundamentus(ticker, (await getTabelaFundamentus()).get(ticker))
   if (doFundamentus) await registrarUltimoValor(doFundamentus)
   return doFundamentus
 }
 
 /**
  * Converte a linha do Fundamentus em cotação. A fonte traz só o fechamento do último pregão,
- * então variação e volume ficam nulos.
+ * então a variação fica nula. A liquidez é a média diária dos últimos 2 meses.
  * @param ticker Ticker normalizado.
  * @param linha Linha do ticker na tabela do Fundamentus, se existir.
  * @returns Cotação de fechamento ou null.
@@ -193,7 +230,7 @@ function cotacaoDoFundamentus(
     preco: linha.cotacao,
     variacao: null,
     variacaoPercent: null,
-    volume: null,
+    liquidez: linha.liquidez2Meses,
     marketCap: null,
   }
 }
@@ -252,8 +289,11 @@ export async function getListaIbovespa(): Promise<AtivoPreco[]> {
     }
 
     // Cotação com variação mantida pelo job de segundo plano (Status Invest).
+    // Fora do pregão, o cache do job expira: usa o fechamento guardado com a data da leitura.
     for (const t of tickers.filter((ticker) => !frescos.has(ticker))) {
-      const daBackground = await cache.get<AtivoPreco>(chaveCotacaoBackground(t))
+      const daBackground =
+        (await cache.get<AtivoPreco>(chaveCotacaoBackground(t))) ??
+        (await cache.get<AtivoPreco>(chaveFechamento(t)))
       if (daBackground) frescos.set(t, daBackground)
     }
 
@@ -284,7 +324,13 @@ export async function getListaIbovespa(): Promise<AtivoPreco[]> {
       { total: cotacoes.length, frescos: frescos.size, faltantes: faltantes.length },
       'lista IBovespa montada',
     )
-    return cotacoes
+    // Liquidez média (2 meses) do Fundamentus para todos: uma única métrica na coluna da lista.
+    const tabelaLiquidez = await getTabelaFundamentus()
+    return cotacoes.map((ativo) => ({
+      ...ativo,
+      liquidez: tabelaLiquidez.get(ativo.ticker)?.liquidez2Meses ?? null,
+      tipo: 'acao' as const,
+    }))
   })
 }
 

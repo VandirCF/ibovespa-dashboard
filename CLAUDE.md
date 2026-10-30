@@ -28,7 +28,8 @@ indicadores fundamentalistas.
 /
 ├── frontend/                   # Next.js 14 (App Router) — package.json próprio
 │   ├── app/                    # layout.tsx, page.tsx (home), ativo/[ticker]/, loading.tsx, global-error.tsx
-│   ├── components/             # BuscaAtivo, ListaAtivos, FatosRelevantes, Indicadores, GraficoCandlestick,
+│   ├── components/             # BuscaAtivo, ListaAtivos, FatosRelevantes, Indicadores, IndicadoresFii,
+│   │                           # PainelAtivos (seletor Ações | Fundos imobiliários), GraficoCandlestick,
 │   │                           # AbasAtivo, CarregadorSentry, ProvedorTema, ...
 │   ├── hooks/                  # useAtivos (SWR)
 │   ├── lib/                    # formatters.ts, mercado.ts, constants.ts, sentry.ts, sentryCliente.ts
@@ -43,9 +44,10 @@ indicadores fundamentalistas.
 │   ├── index.ts                # entry point (CORS, rate limit, error handler, rotas)
 │   ├── routes/                 # ativos.ts, graficos.ts, fatos.ts, indicadores.ts, admin.ts
 │   ├── services/               # brapiService, yahooService, statusInvestService, fundamentusService,
-│   │                           # historicoService, fatosService, indicadoresService
+│   │                           # historicoService, fatosService, indicadoresService, fiisService
 │   ├── lib/                    # cache.ts, db.ts, env.ts, logger.ts, tickers.ts, ativos-ibovespa.ts, sentry.ts,
-│   │                           # throttle.ts (intervalo de 1s entre requisições de scraping)
+│   │                           # throttle.ts (intervalo de 1s entre requisições de scraping),
+│   │                           # pregao.ts (horário de pregão e encerramento do último pregão)
 │   ├── jobs/                   # coletaHistorico.ts (coleta diária), atualizaCotacoes.ts (cotações a cada 5 min)
 │   ├── scripts/                # triggerColeta.ts
 │   ├── types/                  # tipos compartilhados do backend (espelham frontend/types)
@@ -185,7 +187,11 @@ Ao exibir uma abreviatura, escreva-a com o significado por extenso, ex.: `P/L (P
 |---|---|---|---|
 | Preço atual (brapi) | `preco:{ticker}` | 300s | Mercado atualiza a cada 1 min |
 | Cotações em segundo plano (Status Invest) | `cotacao-bg:{ticker}` | 600s | Job a cada 5 min (dias úteis, 10h–18h); traz variação do dia |
+| Último fechamento lido pelo job | `fechamento:{ticker}` | 604800s | Exibido fora do pregão, com a data da leitura (`atualizadoEm`) |
+| Série diária do Fundamentus | `fundamentus:historico:{ticker}` | 3600s | Fallback do gráfico quando Yahoo e brapi falham |
 | Lista IBovespa | `lista:ibovespa` | 300s | Composição muda raramente |
+| Lista de FIIs | `lista:fiis` | 300s | Mesmo ciclo da lista de ações |
+| Tabela de FIIs do Fundamentus | `fundamentus:fiis` | 3600s | Uma requisição cobre todos os fundos |
 | Histórico 1D/1S | `hist:{ticker}:1d` | 300s | Intraday muda com frequência |
 | Histórico 1M/3M | `hist:{ticker}:1m` | 1800s | Muda menos durante o dia |
 | Histórico 1A/5A | `hist:{ticker}:1y` | 3600s | Dados históricos são estáveis |
@@ -248,8 +254,12 @@ GET /quote/{ticker}?modules=defaultKeyStatistics,financialData,balanceSheetHisto
 // 2. Status Invest (cotação atual e variação do dia). A lista usa o cache do job de segundo plano
 //    (cotacao-bg:{ticker}); o detalhe consulta a página do ativo quando o job ainda não tem o dado.
 // 3. Yahoo Finance (lote; sujeito a limite de requisições)
-// 4. Fundamentus (fechamento do último pregão: sem variação nem volume)
-// 5. Último valor bom (ultimo:{ticker})
+// 4. Fechamento guardado pelo job (fechamento:{ticker}), com a data da leitura
+// 5. Fundamentus (fechamento do último pregão: sem variação nem volume)
+// 6. Último valor bom (ultimo:{ticker})
+// Fora do pregão (lib/pregao.ts: seg–sex, 10h–18h de Brasília) a consulta ao vivo ao Status Invest
+// é pulada e o fechamento guardado vem antes do Yahoo: a página mostraria o último fechamento sem data.
+// O campo atualizadoEm indica quando a cotação foi lida; a tela mostra "Fechamento de …" se não for de hoje.
 // Campos sem fonte viram null e são exibidos como "—". Nunca inventar valores.
 ```
 
@@ -261,6 +271,11 @@ GET /quote/{ticker}?modules=defaultKeyStatistics,financialData,balanceSheetHisto
 // Página em ISO-8859-1: decodificar antes de ler. Números no formato pt-BR.
 // Zero em múltiplos e margens significa "não se aplica" (ex.: bancos): vira null.
 // Dividend yield e crescimento aceitam zero como valor real.
+// É a fonte principal dos indicadores (inclusive P/L); a brapi só completa o que falta.
+// Histórico: https://www.fundamentus.com.br/amline/cot_hist.php?papel={ticker}
+//   Exige o header Referer da página cotacoes.php?papel={ticker}; sem ele responde vazio.
+//   Retorna [[timestamp_ms, fechamento], ...] desde 1999: só fechamento, sem OHLC nem volume.
+//   No gráfico, cada candle usa o fechamento nos quatro preços e volume zero. Não há intradiário (1D).
 ```
 
 ### Status Invest (cotação com variação do dia)
@@ -269,10 +284,27 @@ GET /quote/{ticker}?modules=defaultKeyStatistics,financialData,balanceSheetHisto
 // Página: https://statusinvest.com.br/acoes/{ticker}
 // Preço: div[title="Valor atual do ativo"] strong.value
 // Variação: span[title="Variação do valor do ativo com base no dia anterior"] b
-// Volume do dia: h3.title "VOLUME (dia)" → strong.value, em reais.
 // O sinal vem do ícone: arrow_downward = queda. Respeitar o intervalo de 1s (lib/throttle.ts).
-// Unidade do volume em todo o app: R$ (volume financeiro). Brapi e Yahoo informam quantidade
-// de ações; o valor em R$ é estimado multiplicando pelo preço atual.
+// Ações: /acoes/{ticker}. Fundos imobiliários: /fundos-imobiliarios/{ticker} (mesmos seletores).
+// NÃO usar o bloco "VOLUME (dia)": comparado com a brapi, não corresponde a reais nem a
+// quantidade de ações. A coluna da lista é a liquidez média diária (R$, 2 meses) do Fundamentus,
+// para ações e FIIs: uma única métrica, bem definida, para todos os ativos.
+```
+
+### Fundos imobiliários (FIIs)
+
+```typescript
+// Lista: GET /api/ativos?tipo=fii — os 50 FIIs mais líquidos da tabela do Fundamentus
+//   (https://www.fundamentus.com.br/fii_resultado.php, cache fundamentus:fiis).
+// Ações: GET /api/ativos (ou ?tipo=acao). A home alterna pelo seletor e guarda a escolha em ?tipo=fii.
+// Um ticker é FII se estiver na tabela de FIIs (ehFii). O sufixo 11 não basta: units de ações
+// (TAEE11, KLBN11, SANB11) também terminam em 11.
+// Indicadores: GET /api/fiis/:ticker/indicadores (DY, P/VP, FFO yield, cap rate, vacância, imóveis).
+// Comunicados: Investidor10 em /fiis/{ticker}/ (ações em /acoes/{ticker}/), mesma marcação.
+// Cotação e variação: Status Invest /fundos-imobiliarios/{ticker}, coberto pelo job de cotações.
+// Gráfico: mesma cadeia das ações (Yahoo → brapi → histórico do Fundamentus).
+// Zero na tabela de FIIs = "não se aplica", exceto dividend yield, vacância e nº de imóveis
+// (fundo de papel tem zero imóveis).
 ```
 
 ### Yahoo Finance (histórico OHLCV)

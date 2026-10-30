@@ -2,7 +2,10 @@
  * Tipos compartilhados entre frontend e backend.
  */
 
-/** Cotação atual de um ativo do IBovespa. */
+/** Tipo de ativo exibido no app: ação do IBovespa ou fundo imobiliário. */
+export type TipoAtivo = 'acao' | 'fii'
+
+/** Cotação atual de um ativo (ação ou fundo imobiliário). */
 export interface AtivoPreco {
   /** Ticker sem sufixo, ex.: PETR4. */
   ticker: string
@@ -14,8 +17,12 @@ export interface AtivoPreco {
   variacao: number | null
   /** Variação do dia em percentual (2.45 = +2,45%). Null quando indisponível. */
   variacaoPercent: number | null
-  /** Volume negociado no dia. Null quando indisponível. */
-  volume: number | null
+  /** Liquidez média diária em reais nos últimos 2 meses (Fundamentus). Null quando indisponível. */
+  liquidez: number | null
+  /** Tipo do ativo: ação ou fundo imobiliário. */
+  tipo?: TipoAtivo
+  /** Momento da leitura da cotação (ISO 8601). Usado para indicar fechamentos de pregões anteriores. */
+  atualizadoEm?: string
   /** Valor de mercado em reais, quando disponível. */
   marketCap: number | null
   /** Setor em pt-BR (vem do cadastro local de ativos). */
@@ -115,4 +122,31 @@ export interface Indicadores {
   vpa: number | null
   /** Beta: sensibilidade do ativo ao mercado. */
   beta: number | null
+}
+
+/** Indicadores de um fundo imobiliário (Fundamentus). Campos sem dado disponível são null. */
+export interface IndicadoresFii {
+  ticker: string
+  /** Segmento do fundo (ex.: Logística, Lajes Corporativas). */
+  segmento: string | null
+  /** Valor de mercado em reais. */
+  valorMercado: number | null
+  /** P/VP (Preço/Valor Patrimonial). */
+  pvp: number | null
+  /** Dividend Yield dos últimos 12 meses, em percentual. */
+  dividendYield: number | null
+  /** FFO Yield (Funds From Operations / Valor de mercado), em percentual. */
+  ffoYield: number | null
+  /** Cap Rate (receita de aluguel / valor dos imóveis), em percentual. */
+  capRate: number | null
+  /** Vacância média dos imóveis, em percentual. */
+  vacancia: number | null
+  /** Quantidade de imóveis do fundo. */
+  qtdImoveis: number | null
+  /** Preço do m² dos imóveis, em reais. */
+  precoM2: number | null
+  /** Aluguel por m², em reais. */
+  aluguelM2: number | null
+  /** Liquidez média diária em reais (últimos 2 meses). */
+  liquidez: number | null
 }

@@ -58,8 +58,8 @@ function paraAtivoPreco(bruto: unknown): AtivoPreco | null {
     preco: q.regularMarketPrice,
     variacao: q.regularMarketChange,
     variacaoPercent: q.regularMarketChangePercent,
-    // Quantidade de ações convertida em volume financeiro pelo preço atual (estimativa).
-    volume: q.regularMarketVolume * q.regularMarketPrice,
+    // Liquidez média (2 meses) vem do Fundamentus na montagem da lista.
+    liquidez: null,
     marketCap: q.marketCap ?? null,
   }
 }

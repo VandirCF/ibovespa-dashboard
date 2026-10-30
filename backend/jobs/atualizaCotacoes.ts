@@ -1,16 +1,21 @@
 import { Queue, Worker, type Job } from 'bullmq'
 import IORedis from 'ioredis'
-import type { AtivoPreco } from '../types'
+import type { AtivoPreco, TipoAtivo } from '../types'
 import { ATIVOS_IBOVESPA } from '../lib/ativos-ibovespa'
 import { cache } from '../lib/cache'
 import { env } from '../lib/env'
 import { logger } from '../lib/logger'
+import { emHorarioDePregao, fimDoUltimoPregao } from '../lib/pregao'
 import { Sentry, deveIgnorarErro } from '../lib/sentry'
 import { TTL_ULTIMO_VALOR } from '../services/brapiService'
+import { selecionarFiisPrincipais } from '../services/fiisService'
+import { getTabelaFiis } from '../services/fundamentusService'
 import {
   buscarCotacaoStatusInvest,
   chaveCotacaoBackground,
+  chaveFechamento,
   TTL_COTACAO_BACKGROUND,
+  TTL_FECHAMENTO,
 } from '../services/statusInvestService'
 
 /** Nome da fila BullMQ de cotações. */
@@ -50,18 +55,30 @@ function obterFila(): Queue {
 }
 
 /**
- * Consulta o Status Invest para todos os ativos do IBovespa e guarda o resultado no cache.
- * As requisições são sequenciais e respeitam o intervalo de 1 segundo (lib/throttle.ts).
- * Um ativo que falhar não interrompe os demais.
+ * Consulta o Status Invest para as ações do IBovespa e para os FIIs mais líquidos e guarda o
+ * resultado no cache. As requisições são sequenciais e respeitam o intervalo de 1 segundo
+ * (lib/throttle.ts). Um ativo que falhar não interrompe os demais.
  * @returns Quantidade de cotações atualizadas e de falhas.
  */
 export async function atualizarCotacoesBackground(): Promise<ResultadoAtualizacaoCotacoes> {
   const resultado: ResultadoAtualizacaoCotacoes = { ok: 0, falhas: 0 }
 
-  for (const { ticker } of ATIVOS_IBOVESPA) {
-    const cotacao: AtivoPreco | null = await buscarCotacaoStatusInvest(ticker)
+  const fiis = selecionarFiisPrincipais((await getTabelaFiis()).values())
+  const alvos: { ticker: string; tipo: TipoAtivo }[] = [
+    ...ATIVOS_IBOVESPA.map((ativo) => ({ ticker: ativo.ticker, tipo: 'acao' as const })),
+    ...fiis.map((fundo) => ({ ticker: fundo.ticker, tipo: 'fii' as const })),
+  ]
+
+  // Fora do pregão a página mostra o último fechamento: a leitura recebe a data desse pregão.
+  const carimbo = emHorarioDePregao() ? null : fimDoUltimoPregao().toISOString()
+
+  for (const { ticker, tipo } of alvos) {
+    const lida = await buscarCotacaoStatusInvest(ticker, tipo)
+    const cotacao: AtivoPreco | null = lida && carimbo ? { ...lida, atualizadoEm: carimbo } : lida
     if (cotacao) {
       await cache.set(chaveCotacaoBackground(ticker), cotacao, TTL_COTACAO_BACKGROUND)
+      // A última leitura de cada rodada fica disponível por 7 dias: é o fechamento exibido fora do pregão.
+      await cache.set(chaveFechamento(ticker), cotacao, TTL_FECHAMENTO)
       await cache.set(`ultimo:${ticker}`, cotacao, TTL_ULTIMO_VALOR)
       resultado.ok++
     } else {
@@ -100,6 +117,8 @@ export async function iniciarAtualizacaoCotacoes(): Promise<Worker> {
       removeOnFail: 50,
     },
   )
+  // Rodada imediata ao subir o servidor. Fora do pregão, as leituras recebem a data do último
+  // pregão (ver atualizarCotacoesBackground), então o fechamento fica correto mesmo no fim de semana.
   await obterFila().add(JOB_ATUALIZAR_COTACOES, {}, { removeOnComplete: true, removeOnFail: 20 })
 
   const worker = new Worker(NOME_FILA_COTACOES, processar, { connection: criarConexao() })

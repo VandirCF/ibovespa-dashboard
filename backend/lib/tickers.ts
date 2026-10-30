@@ -1,4 +1,4 @@
-/** Padrão de ticker B3: 4 letras + número (ex.: PETR4, ENGI11, NUBR33). */
+/** Padrão de ticker B3: 4 letras + número (ex.: PETR4, ENGI11, KNRI11). */
 export const TICKER_REGEX = /^[A-Z]{4}\d{1,2}$/
 
 /**

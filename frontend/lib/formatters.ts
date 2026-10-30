@@ -151,6 +151,29 @@ export function formatarPercentual(valor: number): string {
   return `${FORMATO_NUMERO_UMA_CASA.format(valor)}%`
 }
 
+const FORMATO_INTEIRO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
+
+/**
+ * Formata um número inteiro com separador de milhar.
+ * @param valor Número a formatar (arredondado).
+ * @returns Texto em pt-BR, ex.: "1.234".
+ */
+export function formatarInteiro(valor: number): string {
+  return FORMATO_INTEIRO.format(valor)
+}
+
+/**
+ * Indica se um instante cai em outro dia civil de Brasília em relação a agora (ex.: fechamento de ontem).
+ * @param instante Momento da leitura da cotação.
+ * @param agora Referência (padrão: agora).
+ * @returns true se o dia civil de Brasília for diferente.
+ */
+export function ehDeOutroDia(instante: Date, agora: Date = new Date()): boolean {
+  const diaDe = (data: Date): string =>
+    data.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+  return diaDe(instante) !== diaDe(agora)
+}
+
 /**
  * Formata somente a hora (HH:mm) no fuso de Brasília, para o eixo de períodos intradiários.
  * @param data Instante a ser formatado.

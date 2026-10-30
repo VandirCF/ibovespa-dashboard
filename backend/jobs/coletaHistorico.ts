@@ -1,6 +1,7 @@
 import { Queue, Worker, type Job } from 'bullmq'
 import IORedis from 'ioredis'
 import type { Candle } from '../types'
+import { ATIVOS_IBOVESPA } from '../lib/ativos-ibovespa'
 import { prisma } from '../lib/db'
 import { env } from '../lib/env'
 import { logger } from '../lib/logger'
@@ -80,7 +81,10 @@ export async function salvarCandles(ativoId: number, candles: readonly Candle[])
  * @returns Quantidade de ativos coletados com sucesso e com falha.
  */
 export async function coletarTodos(): Promise<ResultadoColeta> {
+  // Só os tickers do cadastro atual: códigos antigos (ex.: CCRO3, ELET3) ficam no banco com o
+  // histórico, mas não são mais coletados.
   const ativos = await prisma.ativo.findMany({
+    where: { ticker: { in: ATIVOS_IBOVESPA.map((ativo) => ativo.ticker) } },
     select: { id: true, ticker: true },
     orderBy: { ticker: 'asc' },
   })
