@@ -4,6 +4,7 @@ import type { Candle } from '../types'
 import { prisma } from '../lib/db'
 import { env } from '../lib/env'
 import { logger } from '../lib/logger'
+import { Sentry, deveIgnorarErro } from '../lib/sentry'
 import { buscarCandlesYahoo } from '../services/yahooService'
 
 /** Nome da fila BullMQ de coleta. */
@@ -131,6 +132,9 @@ export async function iniciarColeta(): Promise<Worker> {
   const worker = new Worker(NOME_FILA, processar, { connection: criarConexao() })
   worker.on('failed', (job: Job | undefined, erro: Error) => {
     logger.error({ err: erro, jobId: job?.id }, 'Job de coleta falhou')
+    if (!deveIgnorarErro(erro)) {
+      Sentry.captureException(erro, { tags: { job: job?.name ?? 'desconhecido' } })
+    }
   })
   logger.info({ cron: PADRAO_CRON, tz: 'America/Sao_Paulo' }, 'Coleta diária agendada')
   return worker

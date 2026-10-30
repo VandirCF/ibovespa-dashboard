@@ -5,9 +5,6 @@ import { logger } from './logger'
 /** TTL do preço atual (brapi), em segundos. */
 export const PRECO_TTL = 300
 
-/** TTL da recomendação IA, em segundos. */
-export const RECOMENDACAO_TTL = 3600
-
 /** TTL dos indicadores fundamentalistas, em segundos (dados trimestrais). */
 export const FUNDAMENTUS_TTL = 86400
 

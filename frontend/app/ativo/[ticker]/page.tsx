@@ -7,7 +7,9 @@ import AbasAtivo, { type AbaAtivo } from '@/components/AbasAtivo'
 import BadgeMercado from '@/components/BadgeMercado'
 import CabecalhoBusca from '@/components/CabecalhoBusca'
 import ErroCarregamento from '@/components/ErroCarregamento'
+import FatosRelevantes from '@/components/FatosRelevantes'
 import GraficoCandlestick from '@/components/GraficoCandlestick'
+import Indicadores from '@/components/Indicadores'
 import { LISTA_REVALIDATE_SEGUNDOS } from '@/lib/constants'
 import { formatarMoeda, formatarVariacao } from '@/lib/formatters'
 import { buscarAtivoNoServidor } from '@/services/ativosService'
@@ -134,14 +136,14 @@ export default async function DetalheAtivo({ params }: PropsDetalhe) {
       conteudo: <GraficoCandlestick ticker={ticker} />,
     },
     {
-      id: 'fatos',
-      rotulo: 'Fatos relevantes',
-      conteudo: <p className="text-slate-400">Comunicados da B3 em desenvolvimento.</p>,
+      id: 'indicadores',
+      rotulo: 'Indicadores',
+      conteudo: <Indicadores ticker={ticker} />,
     },
     {
-      id: 'ia',
-      rotulo: 'Recomendação IA',
-      conteudo: <p className="text-slate-400">Análise com IA em desenvolvimento.</p>,
+      id: 'fatos',
+      rotulo: 'Fatos relevantes',
+      conteudo: <FatosRelevantes ticker={ticker} />,
     },
   ]
 

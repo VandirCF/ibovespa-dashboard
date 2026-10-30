@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
+import { CarregadorSentry } from '@/components/CarregadorSentry'
 import { ProvedorTema } from '@/components/ProvedorTema'
 
 const geistSans = localFont({
@@ -34,6 +35,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} antialiased`}>
         <ProvedorTema>{children}</ProvedorTema>
+        <CarregadorSentry />
       </body>
     </html>
   )

@@ -9,11 +9,16 @@
 
 **IBovespa Dashboard** é uma aplicação web que centraliza dados dos principais ativos
 do índice Bovespa com busca, gráficos interativos, fatos relevantes da B3 e
-recomendações geradas pela Claude API.
+indicadores fundamentalistas.
+
+> A recomendação por IA (Claude API) foi **removida** do escopo: cada análise consome tokens.
+> Não reintroduza chamadas à Claude API sem nova decisão explícita do responsável pelo projeto.
 
 - **PRD:** `PRD.md` — requisitos, funcionalidades e métricas de sucesso
 - **Tarefas:** `TASKS.md` — todas as tarefas com critérios de conclusão e prompts prontos
-- **Status atual:** Fase 1 — Scaffold e dados em tempo real
+- **Status atual:** Fases 1, 2 e 3 concluídas. Fase 4 (IA) removida. Fase 5 em andamento:
+  testes E2E, CI, configuração de deploy (Vercel e Railway) e Sentry prontos no código.
+  Pendente: criar as contas e cadastrar os segredos (ver seção de variáveis de ambiente).
 
 ---
 
@@ -22,21 +27,32 @@ recomendações geradas pela Claude API.
 ```
 /
 ├── frontend/                   # Next.js 14 (App Router) — package.json próprio
-│   ├── app/                    # layout.tsx, page.tsx (home), ativo/[ticker]/, loading.tsx
-│   ├── components/             # BuscaAtivo, ListaAtivos, Cabecalho, PainelAtivos
+│   ├── app/                    # layout.tsx, page.tsx (home), ativo/[ticker]/, loading.tsx, global-error.tsx
+│   ├── components/             # BuscaAtivo, ListaAtivos, FatosRelevantes, Indicadores, GraficoCandlestick,
+│   │                           # AbasAtivo, CarregadorSentry, ProvedorTema, ...
 │   ├── hooks/                  # useAtivos (SWR)
-│   ├── lib/                    # formatters.ts, mercado.ts, constants.ts
-│   ├── services/               # ativosService.ts (chamadas à API)
-│   └── types/                  # tipos compartilhados do frontend (espelham backend/types)
+│   ├── lib/                    # formatters.ts, mercado.ts, constants.ts, sentry.ts, sentryCliente.ts
+│   ├── services/               # ativosService, historicoService, fatosService, indicadoresService
+│   ├── tests/e2e/              # testes Playwright: home, busca, detalhe
+│   ├── types/                  # tipos compartilhados do frontend (espelham backend/types)
+│   ├── instrumentation.ts      # carrega o Sentry do servidor Next
+│   ├── next.config.mjs         # withSentryConfig + instrumentationHook
+│   ├── playwright.config.ts    # testes E2E (sobe backend e frontend se não estiverem rodando)
+│   └── vercel.json             # deploy na Vercel (rewrite da API: ver seção de deploy)
 ├── backend/                    # Fastify 4 — package.json próprio
-│   ├── index.ts                # entry point
-│   ├── routes/                 # ativos.ts, graficos.ts, fatos.ts, recomendacoes.ts
-│   ├── services/               # brapiService.ts, yahooService.ts (fatos/análise nas fases seguintes)
-│   ├── lib/                    # cache.ts, db.ts, env.ts, logger.ts, tickers.ts, ativos-ibovespa.ts
-│   ├── jobs/                   # workers BullMQ (T-011)
+│   ├── index.ts                # entry point (CORS, rate limit, error handler, rotas)
+│   ├── routes/                 # ativos.ts, graficos.ts, fatos.ts, indicadores.ts, admin.ts
+│   ├── services/               # brapiService, yahooService, historicoService, fatosService, indicadoresService
+│   ├── lib/                    # cache.ts, db.ts, env.ts, logger.ts, tickers.ts, ativos-ibovespa.ts, sentry.ts
+│   ├── jobs/                   # coletaHistorico.ts (workers BullMQ)
+│   ├── scripts/                # triggerColeta.ts
 │   ├── types/                  # tipos compartilhados do backend (espelham frontend/types)
-│   └── prisma/                 # schema.prisma, migrations/, seed.ts
-├── .github/workflows/ci.yml    # lint, typecheck e build (frontend e backend)
+│   ├── prisma/                 # schema.prisma, migrations/, seed.ts
+│   ├── Dockerfile              # imagem do backend (deploy na Railway)
+│   └── railway.toml            # configuração de build e start na Railway
+├── .github/workflows/
+│   ├── ci.yml                  # lint, typecheck, build (frontend e backend) e testes E2E
+│   └── deploy.yml              # deploy após o CI passar na main
 ├── docker-compose.yml          # PostgreSQL + TimescaleDB e Redis
 ├── PRD.md · TASKS.md · CLAUDE.md · README.md
 ```
@@ -63,6 +79,7 @@ npm run dev
 npm run build
 npm run lint
 npm run typecheck
+npm run test:e2e          # Playwright; usa E2E_BASE_URL se o frontend estiver em outra porta
 ```
 
 ---
@@ -83,7 +100,8 @@ npm run typecheck
 | lightweight-charts | 4.x | Gráficos candlestick |
 | yahoo-finance2 | 2.x | Histórico OHLCV |
 | axios + cheerio | latest | HTTP + scraping |
-| Playwright | 1.x | Testes E2E |
+| @playwright/test | 1.x | Testes E2E |
+| @sentry/nextjs, @sentry/node | 8.x | Monitoramento de erros |
 | Zod | 3.x | Validação de schemas |
 
 ---
@@ -108,7 +126,7 @@ const AtivoPrecoSchema = z.object({
 
 // Prefira interfaces para objetos de domínio, types para unions
 interface AtivoPreco { ticker: string; preco: number }
-type Sinal = 'Comprar' | 'Manter' | 'Vender'
+type CategoriaFato = 'Resultado' | 'Fato Relevante' | 'Aviso' | 'Assembleia' | 'Outros'
 ```
 
 ### Nomenclatura
@@ -119,7 +137,7 @@ Componentes React: PascalCase          → GraficoCandlestick.tsx
 Funções:           camelCase           → getPrecoAtivo()
 Constantes:        SCREAMING_SNAKE     → PRECO_TTL
 Interfaces:        PascalCase          → interface AtivoPreco
-Rotas de API:      kebab-case          → /api/ativos/:ticker/fatos-relevantes
+Rotas de API:      kebab-case          → /api/ativos/:ticker/fatos
 Variáveis de env:  SCREAMING_SNAKE     → BRAPI_TOKEN
 ```
 
@@ -152,6 +170,11 @@ formatarVariacao(-1.30)     // → "-1,30%"
 formatarData('2026-04-09')  // → "09/04/2026"
 ```
 
+### Abreviaturas nos indicadores
+
+Ao exibir uma abreviatura, escreva-a com o significado por extenso, ex.: `P/L (Preço/Lucro)`,
+`ROE (Retorno sobre o Patrimônio)`, `EV/EBITDA (Valor da Firma/EBITDA)`.
+
 ---
 
 ## Regras de cache (não altere sem atualizar aqui)
@@ -165,7 +188,6 @@ formatarData('2026-04-09')  // → "09/04/2026"
 | Histórico 1A/5A | `hist:{ticker}:1y` | 3600s | Dados históricos são estáveis |
 | Fatos relevantes | `fatos:{ticker}` | 3600s | B3 publica algumas vezes ao dia |
 | Indicadores fundamentalistas | `fund:{ticker}` | 86400s | Dados trimestrais |
-| Recomendação IA | `analise:{ticker}` | 3600s | Custo de geração + estabilidade |
 | Último valor bom | `ultimo:{ticker}` | 86400s | Exibido quando brapi e Yahoo falham |
 | Brapi sem acesso | `brapi-sem-acesso:{ticker}` | 21600s | Plano sem o ativo: pula a brapi e usa Yahoo |
 
@@ -178,14 +200,18 @@ Todas as variáveis estão documentadas em `backend/.env.example` e `frontend/.e
 
 ```bash
 # APIs externas
-BRAPI_TOKEN=           # Token da brapi.dev (obrigatório)
-ALPHA_VANTAGE_KEY=     # Chave Alpha Vantage (opcional, tem fallback)
-ANTHROPIC_API_KEY=     # Chave Claude API (obrigatório para recomendações)
+BRAPI_TOKEN=           # Token da brapi.dev (obrigatório: cotações, histórico e indicadores)
 ADMIN_API_KEY=         # Chave do painel /admin/jobs/status (header x-api-key)
 
 # Banco e cache
 DATABASE_URL=          # postgresql://user:pass@localhost:5432/ibovespa
 REDIS_URL=             # redis://localhost:6379
+
+# Monitoramento (opcionais: sem DSN o Sentry fica desligado)
+SENTRY_DSN=            # DSN do Sentry para o backend e o servidor Next
+SENTRY_RELEASE=        # identificador do release (ex.: SHA do commit)
+NEXT_PUBLIC_SENTRY_DSN=  # DSN pública do Sentry para o navegador (vai ao cliente)
+SENTRY_AUTH_TOKEN=     # somente no CI: envia source maps (não vai ao cliente)
 
 # App
 NEXT_PUBLIC_API_URL=   # URL do backend (ex: http://localhost:3001)
@@ -196,7 +222,7 @@ NODE_ENV=              # development | production
 
 ## Integrações externas
 
-### brapi.dev (fonte primária de preços)
+### brapi.dev (fonte primária de preços e de indicadores)
 
 ```typescript
 // Base URL: https://brapi.dev/api
@@ -204,6 +230,9 @@ NODE_ENV=              # development | production
 // Endpoints usados:
 GET /quote/{ticker}?token=X           // Preço de um ativo
 GET /quote/list?sortBy=market_cap_basic&limit=50&token=X  // Lista IBovespa
+GET /quote/{ticker}?modules=defaultKeyStatistics,financialData,balanceSheetHistory&token=X
+// Módulos acima: indicadores fundamentalistas (cache de 24h em fund:{ticker})
+// Módulos disponíveis dependem do plano: summaryDetail não é liberado no plano atual.
 ```
 
 ### Yahoo Finance (histórico OHLCV)
@@ -215,19 +244,11 @@ import yahooFinance from 'yahoo-finance2'
 const result = await yahooFinance.historical('PETR4.SA', { period1: '2025-01-01' })
 ```
 
-### Claude API (recomendações)
-
-```typescript
-// Modelo: claude-sonnet-4-6 (SEMPRE este modelo, não altere)
-// max_tokens: 1000
-// Resposta deve ser JSON válido — use system prompt para garantir
-// Cache de 1 hora obrigatório para controlar custo
-```
-
 ### Investidor10 (fatos relevantes — scraping)
 
 ```typescript
-// URL: https://investidor10.com.br/acoes/{ticker}/#comunicados
+// URL: https://investidor10.com.br/acoes/{ticker}/
+// Seletores: #communications-section .communication-card (data, título e link do documento)
 // Use axios + cheerio
 // Respeite um delay de 1s entre requisições
 // User-agent: 'IBovespa-Dashboard/1.0'
@@ -241,15 +262,13 @@ const result = await yahooFinance.historical('PETR4.SA', { period1: '2025-01-01'
 ```
 ❌ Nunca commite .env com valores reais
 ❌ Nunca use `any` em TypeScript — use `unknown` + type guard
-❌ Nunca chame a Claude API sem verificar o cache primeiro
 ❌ Nunca formate valores monetários ou datas inline — use /lib/formatters.ts
-❌ Nunca remova o aviso regulatório do componente RecomendacaoIA
 ❌ Nunca faça scraping sem o delay de 1s entre requisições
-❌ Nunca exponha API keys no frontend (NEXT_PUBLIC_*)
+❌ Nunca exponha API keys no frontend (NEXT_PUBLIC_*), exceto a DSN pública do Sentry
 ❌ Nunca use WidthType.PERCENTAGE no Prisma/SQL — use valores absolutos
 ❌ Nunca altere TTLs de cache sem atualizar a tabela neste arquivo
 ❌ Nunca use `console.log` em produção — use o logger do Fastify (server) ou noop (client)
-❌ Nunca faça chamadas diretas à Claude API no frontend — sempre via /api/recomendacoes
+❌ Nunca reintroduza chamadas a LLMs pagas (ex.: Claude API) sem decisão explícita: consomem tokens
 ```
 
 ---
@@ -264,7 +283,7 @@ const result = await yahooFinance.historical('PETR4.SA', { period1: '2025-01-01'
 ✅ Formate todos os valores monetários e datas em pt-BR
 ✅ Adicione loading skeleton em todo componente que faz fetch
 ✅ Trate o estado de erro com mensagem amigável + botão de retry
-✅ Marque tarefas como [x] no TASKS.md ao concluí-las
+✅ Marque tarefas como [x] no TASKS.md somente depois de verificar o critério de conclusão
 ✅ Documente funções públicas com JSDoc (parâmetros + retorno)
 ✅ Siga Conventional Commits: feat:, fix:, chore:, docs:, test:
 ```
@@ -300,8 +319,19 @@ Verifique sempre:
 - Tratamento de erro em chamadas de rede
 - Nenhum secret no código
 - Formatação em pt-BR usando formatters.ts
-- Aviso regulatório visível em RecomendacaoIA
+- Abreviaturas dos indicadores escritas por extenso
 ```
+
+---
+
+## Deploy
+
+- **Frontend (Vercel):** `frontend/vercel.json` faz o rewrite de `/api/*` para o backend. A URL de destino
+  é um placeholder (`SUBSTITUA-PELO-DOMINIO-DO-BACKEND`) que precisa ser trocada pelo domínio real da Railway.
+- **Backend (Railway):** `backend/railway.toml` + `backend/Dockerfile`. Root Directory = `backend`.
+  PostgreSQL e Redis são serviços separados na Railway.
+- **Workflow `deploy.yml`:** roda quando o `ci.yml` termina com sucesso na `main`. Usa os segredos
+  `VERCEL_TOKEN` e `RAILWAY_TOKEN`; sem eles, a etapa correspondente é pulada.
 
 ---
 
@@ -311,12 +341,12 @@ Verifique sempre:
 |---|---|
 | Documentação brapi.dev | https://brapi.dev/docs |
 | Lightweight Charts | https://tradingview.github.io/lightweight-charts/ |
-| Alpha Vantage API | https://www.alphavantage.co/documentation/ |
-| Claude API (Anthropic) | https://docs.anthropic.com |
 | Composição IBovespa (B3) | https://www.b3.com.br/pt_br/market-data-e-indices/indices/indices-amplos/ibovespa.htm |
 | Prisma Docs | https://www.prisma.io/docs |
 | Fastify Docs | https://fastify.dev/docs/latest/ |
 | BullMQ Docs | https://docs.bullmq.io |
+| Playwright Docs | https://playwright.dev/docs/intro |
+| Sentry (Next.js) | https://docs.sentry.io/platforms/javascript/guides/nextjs/ |
 
 ---
 

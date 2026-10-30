@@ -1,0 +1,31 @@
+name: Deploy
+
+# Roda somente quando o workflow CI (lint, typecheck, build e testes E2E) termina com sucesso na main.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy (frontend na Vercel, backend na Railway)
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Deploy do frontend (Vercel)
+        if: env.VERCEL_TOKEN != ''
+        working-directory: frontend
+        run: npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
+
+      - name: Deploy do backend (Railway)
+        if: env.RAILWAY_TOKEN != ''
+        working-directory: backend
+        run: npx --yes @railway/cli@latest up --ci

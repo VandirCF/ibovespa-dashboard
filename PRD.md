@@ -1,9 +1,13 @@
 # PRD — IBovespa Dashboard
 
-**Versão:** 1.0  
-**Data:** Abril 2026  
-**Status:** Em elaboração  
+**Versão:** 1.1  
+**Data:** Outubro 2026  
+**Status:** Em desenvolvimento (MVP, fatos relevantes e indicadores entregues; deploy pendente)  
 **Responsável:** A definir
+
+**Histórico de versões**
+- **1.1 (Outubro 2026):** recomendação por IA removida do escopo (cada análise consome tokens); painel de indicadores fundamentalistas ampliado e passa a usar a brapi como fonte; Alpha Vantage e Claude API removidas das fontes; fases atualizadas ao estado real do projeto.
+- **1.0 (Abril 2026):** versão inicial.
 
 ---
 
@@ -11,16 +15,16 @@
 
 ### 1.1 Problema
 
-Investidores pessoa física que operam na B3 precisam consultar múltiplas plataformas para reunir preços, gráficos, fatos relevantes e análises de ativos do IBovespa. Essa fragmentação gera perda de tempo, dificulta a tomada de decisão e não oferece recomendações contextualizadas com inteligência artificial.
+Investidores pessoa física que operam na B3 precisam consultar múltiplas plataformas para reunir preços, gráficos, fatos relevantes e indicadores fundamentalistas de ativos do IBovespa. Essa fragmentação gera perda de tempo e dificulta a comparação entre ativos.
 
 ### 1.2 Solução
 
-O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única interface os dados dos principais ativos do índice Bovespa, com busca inteligente, gráficos interativos, listagem de fatos relevantes da B3 e recomendações geradas por IA (Claude API).
+O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única interface os dados dos principais ativos do índice Bovespa, com busca, gráficos interativos, listagem de fatos relevantes da B3 e um painel completo de indicadores fundamentalistas.
 
 ### 1.3 Objetivo de negócio
 
 - Oferecer uma ferramenta de consulta rápida e acessível para investidores individuais.
-- Demonstrar o uso de IA aplicada a finanças com a Claude API.
+- Apresentar indicadores fundamentalistas organizados por tipo de análise (valuation, rentabilidade, endividamento, crescimento).
 - Servir como produto base para evolução futura com carteira pessoal, alertas e backtesting.
 
 ---
@@ -29,8 +33,8 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 
 | Perfil | Descrição |
 |---|---|
-| Investidor iniciante | Quer entender o desempenho de ativos e receber orientações simplificadas |
-| Investidor intermediário | Analisa gráficos, acompanha fatos relevantes e quer recomendações rápidas |
+| Investidor iniciante | Quer entender o desempenho de ativos e o significado de cada indicador |
+| Investidor intermediário | Analisa gráficos, acompanha fatos relevantes e compara indicadores entre ativos |
 | Estudante de finanças | Usa a plataforma como ferramenta de estudo e pesquisa |
 
 **Fora do escopo:** traders profissionais, gestoras de fundos, plataformas de ordem e execução.
@@ -72,22 +76,29 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 ### 3.4 Fatos relevantes
 
 - Listar os comunicados oficiais mais recentes do ativo selecionado publicados na B3.
-- Informações por comunicado: data/hora, categoria (resultado, fato relevante, aviso, assembleia), título e resumo.
-- Link para o documento original no site da B3.
+- Informações por comunicado: data, categoria (resultado, fato relevante, aviso, assembleia, outros) e título.
+- Link para o documento original do comunicado.
 - Filtro por categoria e por período (últimos 30 / 90 / 180 dias).
-- Exibir no mínimo os 10 comunicados mais recentes.
+- Exibir no mínimo os 10 comunicados mais recentes, com "Carregar mais" quando houver mais.
 
 **Critério de aceite:** Comunicados carregam em menos de 3 segundos. Dados não são mais antigos que 24 horas.
 
-### 3.5 Recomendações com IA
+### 3.5 Indicadores fundamentalistas
 
-- Para cada ativo, gerar uma análise com base em: preço atual, variação dos últimos 30 dias, indicadores P/L, dividend yield, e os 3 fatos relevantes mais recentes.
-- A IA (Claude API) retorna: sinal de recomendação (Comprar / Manter / Vender), justificativa em português com no máximo 200 palavras, e pontos de atenção (positivos e negativos).
-- Aviso obrigatório de que a análise é gerada por IA e não constitui recomendação de investimento regulamentada.
-- Cache da recomendação por 1 hora para o mesmo ativo.
-- Botão de regenerar análise disponível para o usuário.
+Painel na tela de detalhe com 23 indicadores em 4 grupos:
 
-**Critério de aceite:** A recomendação é gerada em menos de 10 segundos. O aviso de "não é recomendação oficial" é sempre visível.
+- **Valuation:** valor de mercado, P/L (Preço/Lucro), P/VP (Preço/Valor Patrimonial), EV/EBITDA, EV/Receita, PEG, Dividend Yield, FCF Yield.
+- **Rentabilidade:** ROE, ROA, margem bruta, margem EBITDA, margem operacional, margem líquida.
+- **Endividamento e liquidez:** dívida líquida/EBITDA, dívida líquida/patrimônio líquido, liquidez corrente, liquidez seca.
+- **Crescimento e por ação:** crescimento da receita e do lucro (12 meses), LPA, VPA, beta.
+
+Regras:
+- Cada indicador tem um tooltip com a explicação do que mede.
+- Abreviaturas aparecem sempre com o significado por extenso.
+- Indicador sem dado disponível é exibido como "—", nunca estimado.
+- Valores em pt-BR (ex.: R$ 716,79 bi, 12,3%, 1,1x).
+
+**Critério de aceite:** Os indicadores são carregados em menos de 3 segundos e atualizados a cada 24 horas.
 
 ---
 
@@ -98,7 +109,7 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 - Tempo de carregamento inicial (LCP): menor que 2,5 segundos em conexão 4G.
 - Core Web Vitals: LCP < 2,5s, INP < 200ms, CLS < 0,1.
 - Cache de dados de preço: TTL de 5 minutos (Redis).
-- Cache de recomendação IA: TTL de 60 minutos (Redis).
+- Cache de indicadores fundamentalistas: TTL de 24 horas (Redis).
 
 ### 4.2 Disponibilidade
 
@@ -116,6 +127,11 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 - A arquitetura deve suportar até 500 usuários simultâneos sem degradação.
 - Jobs de coleta de dados desacoplados da API HTTP via fila (BullMQ).
 
+### 4.5 Observabilidade
+
+- Erros de frontend, de backend e de jobs são enviados ao Sentry quando a DSN estiver configurada.
+- Erros esperados (limite de requisições 429 e cancelamentos) não são enviados.
+
 ---
 
 ## 5. Arquitetura técnica
@@ -131,18 +147,18 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 | Cache | Redis |
 | Fila de jobs | BullMQ |
 | ORM | Prisma |
+| Testes E2E | Playwright |
+| Monitoramento | Sentry |
 | Deploy frontend | Vercel |
-| Deploy backend | Railway ou Render |
+| Deploy backend | Railway |
 
 ### 5.2 Fontes de dados
 
 | Fonte | Dados | Observações |
 |---|---|---|
-| brapi.dev | Preços em tempo real, lista IBovespa | API REST gratuita, limites generosos |
-| yahoo-finance2 (npm) | Histórico OHLCV | Gratuito, sem autenticação |
-| Alpha Vantage | Indicadores fundamentalistas | Plano free: 25 req/dia |
-| B3 / Investidor10 | Fatos relevantes | Scraping controlado |
-| Claude API (Anthropic) | Análise e recomendação IA | claude-sonnet-4-6 |
+| brapi.dev | Preços em tempo real, lista IBovespa, indicadores fundamentalistas | API REST com token; alguns módulos dependem do plano |
+| yahoo-finance2 (npm) | Histórico OHLCV | Gratuito, sem autenticação; sujeito a limite de requisições |
+| B3 / Investidor10 | Fatos relevantes | Scraping controlado, com delay de 1s entre requisições |
 
 ### 5.3 MCPs recomendados (Claude Code)
 
@@ -160,9 +176,8 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 2. Usuário digita no campo de busca (ex.: "PETR4") e seleciona o ativo.
 3. A tela de detalhe abre com gráfico de candlestick do dia atual.
 4. Usuário altera o período para "1 mês" — gráfico recarrega.
-5. Usuário rola para baixo e vê os últimos fatos relevantes da empresa.
-6. Usuário clica em "Gerar análise com IA" — após alguns segundos, a recomendação aparece com sinal e justificativa.
-7. Usuário lê o aviso de que a análise é gerada por IA e não constitui recomendação financeira.
+5. Usuário abre a aba "Indicadores" e vê os indicadores agrupados por tipo de análise, com explicação em cada card.
+6. Usuário abre a aba "Fatos relevantes", filtra por categoria e período e acessa o documento original.
 
 ---
 
@@ -175,6 +190,7 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 - Backtesting de estratégias
 - App mobile nativo
 - Integração com corretoras
+- Recomendação de investimento gerada por IA: foi removida do escopo porque cada análise consome tokens de uma API paga. Pode voltar em uma versão futura, com decisão explícita de custo.
 
 ---
 
@@ -184,7 +200,7 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 |---|---|
 | Usuários únicos por mês | 500 |
 | Tempo médio de sessão | > 3 minutos |
-| Taxa de geração de análise IA | > 30% das sessões |
+| Sessões com consulta a indicadores ou fatos relevantes | > 40% |
 | Uptime | > 99% em dias de pregão |
 | NPS dos primeiros usuários | > 40 |
 
@@ -194,38 +210,41 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 
 | Risco | Probabilidade | Impacto | Mitigação |
 |---|---|---|---|
-| API de dados financeiros instável | Alta | Alto | Implementar fallback entre fontes (brapi → Yahoo Finance) |
-| Rate limit das APIs gratuitas | Média | Médio | Cache agressivo no Redis + fila de jobs |
-| Custo da Claude API escalar | Baixa | Médio | Cache de 1h por recomendação + limite de gerações por usuário |
-| Scraping de fatos relevantes bloqueado | Média | Médio | Manter dois scrapers alternativos (B3 + Investidor10) |
-| Alucinação da IA em recomendações | Alta | Alto | Aviso obrigatório, input estruturado, sem dados inventados |
+| API de dados financeiros instável | Alta | Alto | Fallback entre fontes (brapi → Yahoo Finance) e último valor conhecido |
+| Rate limit das APIs | Média | Médio | Cache agressivo no Redis + fila de jobs |
+| Plano da brapi sem acesso a alguns ativos ou módulos | Alta | Médio | Cache de "sem acesso" por 6h e fallback para Yahoo; indicadores ausentes exibidos como "—" |
+| Scraping de fatos relevantes bloqueado | Média | Médio | Delay de 1s, tratamento de 403/429 com lista vazia e log |
+| Erros em produção sem visibilidade | Média | Alto | Sentry no frontend e no backend, com filtro de erros esperados |
 
 ---
 
 ## 10. Fases de entrega
 
-### Fase 1 — MVP (4 semanas)
-- [ ] Scaffold do projeto (Next.js + Fastify + PostgreSQL + Redis)
-- [ ] Lista de ativos com preços em tempo real (brapi.dev)
-- [ ] Busca com autocomplete
-- [ ] Tela de detalhe com gráfico de candlestick (1D, 1S, 1M, 1A)
+### Fase 1 — MVP (concluída)
+- [x] Scaffold do projeto (Next.js + Fastify + PostgreSQL + Redis)
+- [x] Lista de ativos com preços em tempo real (brapi.dev)
+- [x] Busca com autocomplete
+- [x] Tela de detalhe com gráfico de candlestick (1D, 1S, 1M, 1A)
 
-### Fase 2 — Fatos relevantes (2 semanas)
-- [ ] Integração com fonte de fatos relevantes
-- [ ] Filtros por categoria e período
-- [ ] Link para documento original na B3
+### Fase 2 — Fatos relevantes (concluída)
+- [x] Integração com fonte de fatos relevantes (Investidor10)
+- [x] Filtros por categoria e período
+- [x] Link para o documento original
 
-### Fase 3 — IA (2 semanas)
-- [ ] Integração com Claude API
-- [ ] Geração de recomendação com cache
-- [ ] Aviso regulatório obrigatório
-- [ ] Botão de regenerar análise
+### Fase 3 — Indicadores fundamentalistas (concluída)
+- [x] Painel com 23 indicadores em 4 grupos, com tooltips
+- [x] Fonte brapi, cache de 24 horas e formatação pt-BR
 
-### Fase 4 — Qualidade e deploy (1 semana)
-- [ ] Testes E2E com Playwright
-- [ ] Otimização de Core Web Vitals
-- [ ] Deploy em produção (Vercel + Railway)
-- [ ] Monitoramento com Sentry
+### Fase 4 — Recomendação por IA (removida)
+- Removida do escopo: cada análise consome tokens. Ver seção 7.
+
+### Fase 5 — Qualidade e deploy (em andamento)
+- [x] Testes E2E com Playwright e job de E2E no CI
+- [x] Configuração de deploy (Vercel e Railway) e workflow de deploy na `main`
+- [x] Monitoramento com Sentry configurado no código (ativa com DSN)
+- [ ] Criar contas e cadastrar segredos (Vercel, Railway, Sentry)
+- [ ] Medir Core Web Vitals no PageSpeed Insights (mobile)
+- [ ] Teste E2E da home estável (depende de dados ao vivo da brapi e do Yahoo)
 
 ---
 
@@ -233,9 +252,9 @@ O **IBovespa Dashboard** é uma aplicação web que centraliza em uma única int
 
 - [Documentação brapi.dev](https://brapi.dev/docs)
 - [TradingView Lightweight Charts](https://tradingview.github.io/lightweight-charts/)
-- [Alpha Vantage API](https://www.alphavantage.co/documentation/)
-- [Claude API — Anthropic](https://docs.anthropic.com)
 - [Composição do IBovespa — B3](https://www.b3.com.br/pt_br/market-data-e-indices/indices/indices-amplos/ibovespa.htm)
+- [Playwright](https://playwright.dev/docs/intro)
+- [Sentry para Next.js](https://docs.sentry.io/platforms/javascript/guides/nextjs/)
 
 ---
 

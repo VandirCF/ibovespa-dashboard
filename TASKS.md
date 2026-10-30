@@ -1,11 +1,16 @@
 # TASKS — IBovespa Dashboard
 
-**Versão:** 1.0  
-**Atualizado em:** Abril 2026  
-**Referência:** PRD.md v1.0
+**Versão:** 1.1  
+**Atualizado em:** Outubro 2026  
+**Referência:** PRD.md v1.1
 
 > Use este arquivo como input direto para o Claude Code.  
 > Cada tarefa tem contexto, critério de conclusão e o comando/prompt sugerido.
+
+> **Nota de revisão (v1.1):** as descrições abaixo preservam o plano original. Mudanças já decididas:
+> - **Recomendação por IA (T-014 e T-015) removida:** cada análise consome tokens da Claude API. Menções a Claude API, `RecomendacaoIA`, `ANTHROPIC_API_KEY` e à aba "Recomendação IA" nas tarefas acima são histórico.
+> - **Indicadores (T-016):** a fonte passou a ser a brapi (módulos `defaultKeyStatistics`, `financialData` e `balanceSheetHistory`); a Alpha Vantage não é mais usada e `ALPHA_VANTAGE_KEY` não é necessária.
+> - Em caso de conflito com o `CLAUDE.md`, vale o `CLAUDE.md`.
 
 ---
 
@@ -373,10 +378,10 @@ Crie a rota GET /api/ativos/:ticker/fatos?limite=10&categoria=all&dias=90
 ```
 
 **Critério de conclusão:**
-- [ ] GET /api/ativos/PETR4/fatos retorna ao menos 5 comunicados
-- [ ] Cada comunicado tem titulo, categoria, data e URL do documento
-- [ ] Filtro por categoria funciona
-- [ ] Cache evita scraping repetido dentro de 1 hora
+- [x] GET /api/ativos/PETR4/fatos retorna ao menos 5 comunicados
+- [x] Cada comunicado tem titulo, categoria, data e URL do documento
+- [x] Filtro por categoria funciona
+- [x] Cache evita scraping repetido dentro de 1 hora
 
 ---
 
@@ -401,9 +406,9 @@ Crie o componente /components/FatosRelevantes.tsx:
 ```
 
 **Critério de conclusão:**
-- [ ] Cards renderizam com dados reais de PETR4
-- [ ] Filtro de categoria funciona sem reload
-- [ ] Link do documento abre em nova aba
+- [x] Cards renderizam com dados reais de PETR4
+- [x] Filtro de categoria funciona sem reload
+- [x] Link do documento abre em nova aba
 - [ ] Skeleton aparece durante o carregamento
 - [ ] Estado vazio e erro exibidos corretamente
 
@@ -411,7 +416,7 @@ Crie o componente /components/FatosRelevantes.tsx:
 
 ## FASE 4 — Recomendações com IA
 
-### T-014 — Serviço de análise com Claude API
+### T-014 — Serviço de análise com Claude API *(removida: consome tokens a cada análise)*
 
 **Prioridade:** Alta  
 **Estimativa:** 90 min  
@@ -445,7 +450,7 @@ Crie a rota DELETE /api/ativos/:ticker/analise/cache (para forçar regeneração
 
 ---
 
-### T-015 — Componente de recomendação IA
+### T-015 — Componente de recomendação IA *(removida junto com o T-014)*
 
 **Prioridade:** Alta  
 **Estimativa:** 60 min  
@@ -470,11 +475,11 @@ Crie o componente /components/RecomendacaoIA.tsx:
 ```
 
 **Critério de conclusão:**
-- [ ] Fluxo completo funciona: botão → loading → resultado
-- [ ] Badge de sinal com cor correta
-- [ ] Aviso regulatório SEMPRE visível (não pode ser dispensado)
+- [x] Fluxo completo funciona: botão → loading → resultado
+- [x] Badge de sinal com cor correta
+- [x] Aviso regulatório SEMPRE visível (não pode ser dispensado)
 - [ ] Botão "Regenerar" chama DELETE /cache e depois POST /analise
-- [ ] Estado de erro exibido corretamente
+- [x] Estado de erro exibido corretamente
 
 ---
 
@@ -500,15 +505,15 @@ Crie o componente /components/Indicadores.tsx com os dados:
 - Market Cap (R$ bi)
 
 Exiba como grid de cards 2x4. Cada card: nome do indicador (muted), valor em destaque, tooltip explicando o que é o indicador.
-Fonte: Alpha Vantage OVERVIEW endpoint. Cache TTL: 86400s (24h).
+Fonte: brapi (módulos defaultKeyStatistics, financialData e balanceSheetHistory), que já é usada pelo projeto. Cache TTL: 86400s (24h). A Alpha Vantage deixou de ser usada.
 Crie a rota GET /api/ativos/:ticker/indicadores
 ```
 
 **Critério de conclusão:**
-- [ ] Grid de indicadores aparece na tela de detalhe
-- [ ] Tooltips explicativos funcionam
+- [x] Grid de indicadores aparece na tela de detalhe
+- [x] Tooltips explicativos funcionam
 - [ ] Dados atualizados a cada 24 horas
-- [ ] Valores formatados em pt-BR (ex.: R$ 4,5 bi, 12,3%)
+- [x] Valores formatados em pt-BR (ex.: R$ 4,5 bi, 12,3%)
 
 ---
 
@@ -546,9 +551,9 @@ Configure Playwright e crie os testes em /tests/e2e/:
 ```
 
 **Critério de conclusão:**
-- [ ] Todos os 4 arquivos de teste criados
+- [x] Todos os 4 arquivos de teste criados
 - [ ] `npx playwright test` roda sem erros críticos (pode ter flaky em dados ao vivo)
-- [ ] CI configurado para rodar os testes
+- [x] CI configurado para rodar os testes
 
 ---
 

@@ -5,9 +5,10 @@ import { env } from './lib/env'
 import { ativosRoutes } from './routes/ativos'
 import { graficosRoutes } from './routes/graficos'
 import { fatosRoutes } from './routes/fatos'
-import { recomendacoesRoutes } from './routes/recomendacoes'
+import { indicadoresRoutes } from './routes/indicadores'
 import { adminRoutes } from './routes/admin'
 import { iniciarColeta } from './jobs/coletaHistorico'
+import { Sentry, deveIgnorarErro, iniciarSentry } from './lib/sentry'
 
 /** Limite de requisições por IP na API pública (PRD 4.3). */
 const RATE_LIMIT_MAX = 60
@@ -33,6 +34,16 @@ export async function criarServidor(): Promise<FastifyInstance> {
     timeWindow: '1 minute',
   })
 
+  app.setErrorHandler((erro, _req, reply) => {
+    const status = erro.statusCode ?? 500
+    if (status >= 500 && !deveIgnorarErro(erro)) {
+      Sentry.captureException(erro)
+    }
+    return reply
+      .status(status)
+      .send({ erro: status >= 500 ? 'Erro interno do servidor.' : erro.message })
+  })
+
   app.get('/health', async (): Promise<{ status: 'ok'; timestamp: string }> => ({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -41,7 +52,7 @@ export async function criarServidor(): Promise<FastifyInstance> {
   await app.register(ativosRoutes, { prefix: '/api' })
   await app.register(graficosRoutes, { prefix: '/api' })
   await app.register(fatosRoutes, { prefix: '/api' })
-  await app.register(recomendacoesRoutes, { prefix: '/api' })
+  await app.register(indicadoresRoutes, { prefix: '/api' })
 
   await app.register(adminRoutes)
 
@@ -53,6 +64,7 @@ export async function criarServidor(): Promise<FastifyInstance> {
  * @returns Promise que resolve quando o servidor estiver escutando.
  */
 async function main(): Promise<void> {
+  iniciarSentry()
   const app = await criarServidor()
   await app.listen({ port: env.PORT, host: '0.0.0.0' })
   await iniciarColeta()

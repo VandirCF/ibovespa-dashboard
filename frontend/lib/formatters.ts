@@ -128,6 +128,29 @@ export function formatarDataHoraCurta(data: Date): string {
   return `${formatarDataCurta(data)} ${hora}`
 }
 
+const FORMATO_NUMERO_UMA_CASA = new Intl.NumberFormat('pt-BR', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})
+
+/**
+ * Formata um número com uma casa decimal, sem sinal nem unidade.
+ * @param valor Número a formatar.
+ * @returns Texto em pt-BR, ex.: "8,5".
+ */
+export function formatarNumero(valor: number): string {
+  return FORMATO_NUMERO_UMA_CASA.format(valor)
+}
+
+/**
+ * Formata um percentual com uma casa decimal, sem sinal.
+ * @param valor Percentual em pontos (12.3 para 12,3%).
+ * @returns Texto em pt-BR, ex.: "12,3%".
+ */
+export function formatarPercentual(valor: number): string {
+  return `${FORMATO_NUMERO_UMA_CASA.format(valor)}%`
+}
+
 /**
  * Formata somente a hora (HH:mm) no fuso de Brasília, para o eixo de períodos intradiários.
  * @param data Instante a ser formatado.

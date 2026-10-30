@@ -9,11 +9,11 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   FRONTEND_ORIGIN: z.string().url().default('http://localhost:3000'),
   BRAPI_TOKEN: z.string().optional(),
-  ALPHA_VANTAGE_KEY: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
   ADMIN_API_KEY: z.string().optional(),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   DATABASE_URL: z.string().optional(),
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_RELEASE: z.string().optional(),
 })
 
 export type Env = z.infer<typeof EnvSchema>
