@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { formatarHora } from '@/lib/formatters'
 import BadgeMercado from './BadgeMercado'
+import BotaoTema from './BotaoTema'
 
 interface PropsCabecalho {
   /**
@@ -18,30 +19,38 @@ interface PropsCabecalho {
 }
 
 /**
- * Cabeçalho do app: logo, status do mercado, horário da última atualização e busca.
+ * Cabeçalho do app: logo, status do mercado, horário da última atualização, busca e tema.
  * @param props.atualizadoEm Horário da última atualização (opcional).
  * @param props.children Conteúdo extra à direita (ex.: BuscaAtivo).
- * @returns Barra superior fixa.
+ * @param props.largura Largura do conteúdo.
+ * @returns Barra superior fixa com destaque.
  */
 export default function Cabecalho({ atualizadoEm, children, largura = 'padrao' }: PropsCabecalho) {
   const classeLargura =
     largura === 'total' ? 'w-full px-4 sm:px-6 lg:px-8' : 'mx-auto max-w-6xl px-4'
+
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-800 bg-fundo/90 backdrop-blur">
-      <div className={`flex flex-wrap items-center gap-3 py-3 ${classeLargura}`}>
-        <Link href="/" className="text-lg font-bold tracking-tight text-slate-100">
+    <header className="barra-topo sticky top-0 z-10 backdrop-blur">
+      <div className={`flex flex-wrap items-center gap-4 py-4 ${classeLargura}`}>
+        <Link
+          href="/"
+          className="text-4xl font-extrabold leading-none tracking-tight text-slate-100"
+        >
           IBovespa <span className="text-alta">Dashboard</span>
         </Link>
 
         <BadgeMercado />
 
         {atualizadoEm !== undefined && (
-          <div className="order-last w-full text-xs text-slate-400 sm:order-none sm:ml-auto sm:w-auto">
+          <div className="order-last w-full text-sm text-slate-400 sm:order-none sm:ml-auto sm:w-auto">
             {atualizadoEm ? `Atualizado às ${formatarHora(atualizadoEm)}` : 'Carregando cotações…'}
           </div>
         )}
 
-        <div className="w-full sm:w-auto">{children}</div>
+        <div className="flex w-full items-center gap-3 sm:w-auto">
+          <div className="min-w-0 flex-1 sm:flex-none">{children}</div>
+          <BotaoTema />
+        </div>
       </div>
     </header>
   )

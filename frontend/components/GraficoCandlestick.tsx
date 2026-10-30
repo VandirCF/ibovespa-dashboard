@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ColorType,
   CrosshairMode,
+  TickMarkType,
   createChart,
   type CandlestickData,
   type HistogramData,
@@ -11,15 +12,20 @@ import {
   type ISeriesApi,
   type LineData,
   type LogicalRange,
+  type Time,
   type UTCTimestamp,
 } from 'lightweight-charts'
 import useSWR from 'swr'
 import type { Candle, Periodo } from '@/types'
 import { buscarHistorico } from '@/services/historicoService'
+import { useTema, type Tema } from './ProvedorTema'
 import {
   formatarData,
+  formatarDataCurta,
   formatarDataHora,
+  formatarDataHoraCurta,
   formatarHora,
+  formatarHoraCurta,
   formatarMoeda,
   formatarVolume,
 } from '@/lib/formatters'
@@ -29,12 +35,21 @@ const COR_ALTA = '#16A34A'
 const COR_BAIXA = '#DC2626'
 const COR_MEDIA_20 = '#FACC15'
 const COR_MEDIA_50 = '#60A5FA'
-const COR_GRADE = '#1e293b'
-const COR_BORDA = '#334155'
-const COR_TEXTO = '#94a3b8'
 
-/** Proporção do painel de preço e do painel de volume (o volume ocupa o restante). */
+/** Cores de grade, bordas e texto do gráfico, por tema. */
+const CORES_TEMA: Record<Tema, { grade: string; borda: string; texto: string }> = {
+  escuro: { grade: '#1e293b', borda: '#334155', texto: '#94a3b8' },
+  claro: { grade: '#e2e8f0', borda: '#cbd5e1', texto: '#475569' },
+}
+
+/** Proporção do painel de preço (o volume ocupa o restante). */
 const FRACAO_PRECO = 0.72
+
+/** Abertura do pregão da B3 em horário de Brasília (início de cada dia no intradiário). */
+const HORA_ABERTURA = '10:00:00'
+
+/** Espaçamento dos candles intradiários em segundos (1D: 5 minutos; 1S: 1 hora). */
+const PASSO_INTRADIARIO: Partial<Record<Periodo, number>> = { '1d': 300, '1w': 3600 }
 
 /** Períodos exibidos no seletor (rótulo → valor da API). */
 const PERIODOS: { valor: Periodo; rotulo: string }[] = [
@@ -46,17 +61,30 @@ const PERIODOS: { valor: Periodo; rotulo: string }[] = [
   { valor: '5y', rotulo: '5A' },
 ]
 
-/** Períodos com candles intradiários: o tooltip mostra também a hora. */
+/** Períodos com candles intradiários: o eixo e o tooltip mostram também a hora. */
 const PERIODOS_INTRADIARIOS: Periodo[] = ['1d', '1w']
 
 interface PropsGrafico {
   ticker: string
 }
 
-/** Estrutura do tooltip exibido ao passar o mouse. */
+/** Dados exibidos no tooltip ao passar o mouse. */
 interface DadosTooltip {
   candle: Candle
   x: number
+}
+
+/** Intervalo de datas digitado pelo usuário (AAAA-MM-DD, horário de Brasília). */
+interface IntervaloDatas {
+  inicio: string
+  fim: string
+}
+
+/** Séries prontas para o lightweight-charts, com os inícios de dia para o eixo. */
+interface SeriesGrafico {
+  candles: CandlestickData<UTCTimestamp>[]
+  volumes: HistogramData<UTCTimestamp>[]
+  inicios: Set<number>
 }
 
 /**
@@ -66,6 +94,77 @@ interface DadosTooltip {
  */
 function paraSegundos(iso: string): UTCTimestamp {
   return Math.floor(new Date(iso).getTime() / 1000) as UTCTimestamp
+}
+
+/**
+ * Dia civil (AAAA-MM-DD) de um timestamp no fuso de Brasília.
+ * @param iso Timestamp ISO do candle.
+ * @returns Data no formato AAAA-MM-DD.
+ */
+function diaBrasilia(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+}
+
+/**
+ * Instante (segundos UTC) da abertura do pregão do dia do timestamp informado.
+ * @param iso Timestamp de qualquer candle daquele dia.
+ * @returns Segundos UTC de 10:00 em Brasília (UTC-03:00, sem horário de verão desde 2019).
+ */
+function aberturaDoDia(iso: string): number {
+  return Math.floor(new Date(`${diaBrasilia(iso)}T${HORA_ABERTURA}-03:00`).getTime() / 1000)
+}
+
+/**
+ * Período da API que cobre a data inicial digitada, contando a partir de hoje (Brasília).
+ * @param inicio Data inicial no formato AAAA-MM-DD.
+ * @param hoje Data de hoje no formato AAAA-MM-DD.
+ * @returns Período mais curto que contém a data inicial.
+ */
+function periodoParaInicio(inicio: string, hoje: string): Periodo {
+  if (inicio >= hoje) return '1d'
+  const dias = Math.round((Date.parse(hoje) - Date.parse(inicio)) / 864e5)
+  if (dias <= 5) return '1w'
+  if (dias <= 31) return '1m'
+  if (dias <= 92) return '3m'
+  if (dias <= 366) return '1y'
+  return '5y'
+}
+
+/**
+ * Monta as séries do gráfico. No intradiário, cada dia começa na abertura do pregão: se o primeiro
+ * candle do dia vier depois, o intervalo até ele é preenchido com espaços vazios (whitespace).
+ * @param data Candles ordenados do mais antigo para o mais recente.
+ * @param intradiario Se o período é intradiário.
+ * @param passo Espaçamento dos candles intradiários, em segundos.
+ * @returns Séries de candles e volume e o conjunto de inícios de dia.
+ */
+function montarSeries(data: readonly Candle[], intradiario: boolean, passo: number): SeriesGrafico {
+  const candles: CandlestickData<UTCTimestamp>[] = []
+  const volumes: HistogramData<UTCTimestamp>[] = []
+  const inicios = new Set<number>()
+  let diaAnterior = ''
+
+  for (const c of data) {
+    const tempo = paraSegundos(c.timestamp)
+    const dia = diaBrasilia(c.timestamp)
+    if (intradiario && dia !== diaAnterior) {
+      const abertura = aberturaDoDia(c.timestamp)
+      inicios.add(abertura)
+      for (let t = abertura; t < tempo; t += passo) {
+        candles.push({ time: t as UTCTimestamp } as CandlestickData<UTCTimestamp>)
+        volumes.push({ time: t as UTCTimestamp } as HistogramData<UTCTimestamp>)
+      }
+    }
+    diaAnterior = dia
+
+    candles.push({ time: tempo, open: c.open, high: c.high, low: c.low, close: c.close })
+    volumes.push({
+      time: tempo,
+      value: c.volume,
+      color: c.close >= c.open ? `${COR_ALTA}99` : `${COR_BAIXA}99`,
+    })
+  }
+  return { candles, volumes, inicios }
 }
 
 /**
@@ -88,26 +187,36 @@ function mediaMovel(candles: readonly Candle[], janela: number): LineData<UTCTim
 }
 
 /**
- * Opções comuns a todos os painéis do gráfico (cores, grade e fonte).
- * @returns Opções para `createChart`, sem dimensões.
+ * Aplica as cores do tema aos dois painéis do gráfico.
+ * @param graficos Painel de preço e painel de volume.
+ * @param tema Tema atual.
  */
-function opcoesBase() {
-  return {
-    layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: COR_TEXTO },
-    grid: { vertLines: { color: COR_GRADE }, horzLines: { color: COR_GRADE } },
-    crosshair: { mode: CrosshairMode.Normal },
+function aplicarCores(graficos: IChartApi[], tema: Tema): void {
+  const cores = CORES_TEMA[tema]
+  for (const g of graficos) {
+    g.applyOptions({
+      layout: { textColor: cores.texto },
+      grid: { vertLines: { color: cores.grade }, horzLines: { color: cores.grade } },
+      rightPriceScale: { borderColor: cores.borda },
+      timeScale: { borderColor: cores.borda },
+    })
   }
 }
 
 /**
- * Gráfico de candlestick com painel de volume abaixo, seletor de período, médias móveis e tooltip.
- * Preço e volume são dois gráficos sincronizados no mesmo intervalo de tempo.
- * Ao trocar o período, o gráfico anterior fica visível até os novos dados chegarem.
+ * Gráfico de candlestick com painel de volume abaixo, seletor de período, intervalo de datas
+ * digitado, médias móveis, tooltip e cores do tema claro/escuro.
+ * No intradiário, cada dia começa na abertura do pregão (10:00) e a data aparece só no início do dia.
  * @param props.ticker Ticker do ativo, ex.: "PETR4".
  * @returns Gráfico interativo ou estado de carregamento/erro.
  */
 export default function GraficoCandlestick({ ticker }: PropsGrafico) {
-  const [periodo, setPeriodo] = useState<Periodo>('1d')
+  const { tema } = useTema()
+  const [periodoBotao, setPeriodoBotao] = useState<Periodo>('1d')
+  // Intervalo digitado e aplicado (o gráfico só muda após Aplicar).
+  const [aplicado, setAplicado] = useState<IntervaloDatas | null>(null)
+  // Rascunho do que está nos campos De/Até; null = mostrar as datas automáticas.
+  const [rascunho, setRascunho] = useState<IntervaloDatas | null>(null)
   const [mostrarMM20, setMostrarMM20] = useState(false)
   const [mostrarMM50, setMostrarMM50] = useState(false)
   const [tooltip, setTooltip] = useState<DadosTooltip | null>(null)
@@ -123,24 +232,66 @@ export default function GraficoCandlestick({ ticker }: PropsGrafico) {
   const mm20Ref = useRef<ISeriesApi<'Line'> | null>(null)
   const mm50Ref = useRef<ISeriesApi<'Line'> | null>(null)
 
+  // Hoje em Brasília (AAAA-MM-DD), usado como limite das datas e para escolher o período da API.
+  const hoje = diaBrasilia(new Date().toISOString())
+
+  // Com intervalo aplicado, busca o período da API que cobre a data inicial; senão, usa o botão.
+  const periodo: Periodo = aplicado ? periodoParaInicio(aplicado.inicio, hoje) : periodoBotao
+
   const { data, error, isLoading, mutate } = useSWR<Candle[]>(
     ['historico', ticker, periodo],
     () => buscarHistorico(ticker, periodo),
     { keepPreviousData: true, revalidateOnFocus: false },
   )
 
-  // Índice tempo → candle, usado pelo tooltip.
+  // Candles exibidos: todos, ou só os do intervalo aplicado (dias civis de Brasília).
+  const dadosExibidos = useMemo<Candle[] | undefined>(() => {
+    if (!data) return undefined
+    if (!aplicado) return data
+    return data.filter((c) => {
+      const dia = diaBrasilia(c.timestamp)
+      return dia >= aplicado.inicio && dia <= aplicado.fim
+    })
+  }, [data, aplicado])
+
+  // Datas automáticas: primeiro e último dia do que está sendo exibido.
+  const automatico: IntervaloDatas | null =
+    dadosExibidos && dadosExibidos.length > 0
+      ? {
+          inicio: diaBrasilia(dadosExibidos[0].timestamp),
+          fim: diaBrasilia(dadosExibidos[dadosExibidos.length - 1].timestamp),
+        }
+      : null
+
+  // Valores nos campos: o rascunho, se existir; senão, as datas automáticas.
+  const valorInicio = rascunho?.inicio ?? automatico?.inicio ?? ''
+  const valorFim = rascunho?.fim ?? automatico?.fim ?? ''
+  const datasInvalidas = Boolean(valorInicio && valorFim && valorInicio > valorFim)
+  const podeAplicar = Boolean(rascunho && rascunho.inicio && rascunho.fim && !datasInvalidas)
+
+  const intradiario = PERIODOS_INTRADIARIOS.includes(periodo)
+
+  // Índice tempo → candle, usado pelo tooltip (só candles reais, sem espaços vazios).
   const porTempo = useMemo(() => {
     const mapa = new Map<number, Candle>()
-    for (const c of data ?? []) mapa.set(paraSegundos(c.timestamp), c)
+    for (const c of dadosExibidos ?? []) mapa.set(paraSegundos(c.timestamp), c)
     return mapa
-  }, [data])
+  }, [dadosExibidos])
 
-  // Referência atual do índice para o handler do crosshair (registrado uma única vez).
+  // Referências atuais usadas por handlers registrados uma única vez.
   const porTempoRef = useRef(porTempo)
+  const intradiarioRef = useRef(intradiario)
+  const temaRef = useRef(tema)
+  const inicioDiaRef = useRef<Set<number>>(new Set())
   useEffect(() => {
     porTempoRef.current = porTempo
   }, [porTempo])
+  useEffect(() => {
+    intradiarioRef.current = intradiario
+  }, [intradiario])
+  useEffect(() => {
+    temaRef.current = tema
+  }, [tema])
 
   // Cria os dois gráficos uma vez, sincroniza o tempo e os destrói ao desmontar.
   useEffect(() => {
@@ -148,24 +299,60 @@ export default function GraficoCandlestick({ ticker }: PropsGrafico) {
     const volumeEl = volumeRef.current
     if (!precoEl || !volumeEl) return
 
+    // Legenda do cursor: data completa. No intradiário, o eixo mostra só a hora.
+    const formatarEixo = (tempo: Time): string => {
+      const instante = new Date(Number(tempo) * 1000)
+      return intradiarioRef.current ? formatarDataHoraCurta(instante) : formatarDataCurta(instante)
+    }
+
+    // Eixo: no intradiário, a data aparece só no início de cada dia; nos demais, só a hora.
+    // Nos períodos diários, a data aparece sempre.
+    const tiposData = new Set<TickMarkType>([
+      TickMarkType.Year,
+      TickMarkType.Month,
+      TickMarkType.DayOfMonth,
+    ])
+    const formatarTick = (tempo: Time, tipo: TickMarkType): string => {
+      const instante = new Date(Number(tempo) * 1000)
+      if (!intradiarioRef.current) return formatarDataCurta(instante)
+      if (inicioDiaRef.current.has(Number(tempo)) || tiposData.has(tipo))
+        return formatarDataCurta(instante)
+      return formatarHoraCurta(instante)
+    }
+
+    const cores = CORES_TEMA[temaRef.current]
+    const opcoesComuns = {
+      layout: {
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: cores.texto,
+      },
+      grid: { vertLines: { color: cores.grade }, horzLines: { color: cores.grade } },
+      crosshair: { mode: CrosshairMode.Normal },
+      localization: { locale: 'pt-BR', timeFormatter: formatarEixo },
+    }
+
     const preco = createChart(precoEl, {
-      ...opcoesBase(),
+      ...opcoesComuns,
       width: precoEl.clientWidth,
       height: precoEl.clientHeight,
-      rightPriceScale: { borderColor: COR_BORDA, scaleMargins: { top: 0.06, bottom: 0.04 } },
-      timeScale: { visible: false, borderColor: COR_BORDA },
+      rightPriceScale: { borderColor: cores.borda, scaleMargins: { top: 0.06, bottom: 0.04 } },
+      timeScale: { visible: false, borderColor: cores.borda },
     })
 
     const volume = createChart(volumeEl, {
-      ...opcoesBase(),
+      ...opcoesComuns,
       width: volumeEl.clientWidth,
       height: volumeEl.clientHeight,
       rightPriceScale: {
         visible: false,
-        borderColor: COR_BORDA,
+        borderColor: cores.borda,
         scaleMargins: { top: 0.1, bottom: 0 },
       },
-      timeScale: { borderColor: COR_BORDA, timeVisible: true },
+      timeScale: {
+        borderColor: cores.borda,
+        timeVisible: true,
+        tickMarkFormatter: (tempo: Time, tipo: TickMarkType) => formatarTick(tempo, tipo),
+      },
     })
 
     candleRef.current = preco.addCandlestickSeries({
@@ -206,14 +393,13 @@ export default function GraficoCandlestick({ ticker }: PropsGrafico) {
     graficoPrecoRef.current = preco
     graficoVolumeRef.current = volume
 
-    const wrapper = wrapperRef.current
     const observador = new ResizeObserver(() => {
       preco.resize(precoEl.clientWidth, precoEl.clientHeight)
       volume.resize(volumeEl.clientWidth, volumeEl.clientHeight)
       // Ao mudar a largura, reajusta para caber todo o período (senão mostra só o final).
       preco.timeScale().fitContent()
     })
-    if (wrapper) observador.observe(wrapper)
+    if (wrapperRef.current) observador.observe(wrapperRef.current)
 
     return () => {
       observador.disconnect()
@@ -228,28 +414,31 @@ export default function GraficoCandlestick({ ticker }: PropsGrafico) {
     }
   }, [])
 
-  // Envia candles e volume para as séries sempre que chegam dados novos.
+  // Troca as cores do gráfico quando o tema muda.
   useEffect(() => {
-    if (!data || !candleRef.current || !volumeSerieRef.current) return
-    candleRef.current.setData(
-      data.map((c) => ({
-        time: paraSegundos(c.timestamp),
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      })) as CandlestickData<UTCTimestamp>[],
-    )
-    volumeSerieRef.current.setData(
-      data.map((c) => ({
-        time: paraSegundos(c.timestamp),
-        value: c.volume,
-        color: c.close >= c.open ? `${COR_ALTA}99` : `${COR_BAIXA}99`,
-      })) as HistogramData<UTCTimestamp>[],
-    )
-    graficoPrecoRef.current?.timeScale().fitContent()
-    graficoVolumeRef.current?.timeScale().fitContent()
-  }, [data])
+    const preco = graficoPrecoRef.current
+    const volume = graficoVolumeRef.current
+    if (preco && volume) aplicarCores([preco, volume], tema)
+  }, [tema])
+
+  // Envia candles e volume para as séries sempre que os dados exibidos mudam.
+  useEffect(() => {
+    if (!dadosExibidos || !candleRef.current || !volumeSerieRef.current) return
+    const series = montarSeries(dadosExibidos, intradiario, PASSO_INTRADIARIO[periodo] ?? 0)
+    inicioDiaRef.current = series.inicios
+    candleRef.current.setData(series.candles)
+    volumeSerieRef.current.setData(series.volumes)
+
+    // Ajusta a escala depois do desenho: com espaços vazios no início, o ajuste imediato
+    // pode usar a largura antiga e deixar o começo do período fora da tela.
+    const ajustar = (): void => {
+      graficoPrecoRef.current?.timeScale().fitContent()
+      graficoVolumeRef.current?.timeScale().fitContent()
+    }
+    ajustar()
+    const id = window.setTimeout(ajustar, 50)
+    return () => window.clearTimeout(id)
+  }, [dadosExibidos, intradiario, periodo])
 
   // Liga e desliga as médias móveis como séries de linha no painel de preço.
   useEffect(() => {
@@ -273,42 +462,124 @@ export default function GraficoCandlestick({ ticker }: PropsGrafico) {
         preco.removeSeries(ref.current)
         ref.current = null
       }
-      if (ativa && ref.current && data) {
-        ref.current.setData(mediaMovel(data, janela))
+      if (ativa && ref.current && dadosExibidos) {
+        ref.current.setData(mediaMovel(dadosExibidos, janela))
       }
     }
     sincronizar(mostrarMM20, mm20Ref, 20, COR_MEDIA_20)
     sincronizar(mostrarMM50, mm50Ref, 50, COR_MEDIA_50)
-  }, [data, mostrarMM20, mostrarMM50])
+  }, [dadosExibidos, mostrarMM20, mostrarMM50])
 
-  const intradiario = PERIODOS_INTRADIARIOS.includes(periodo)
-  const semDados = data !== undefined && data.length === 0
+  const semDados = dadosExibidos !== undefined && dadosExibidos.length === 0
+
+  /**
+   * Seleciona um período pelo botão: volta ao automático e descarta datas digitadas.
+   * @param valor Período escolhido.
+   */
+  function escolherPeriodo(valor: Periodo): void {
+    setPeriodoBotao(valor)
+    setAplicado(null)
+    setRascunho(null)
+  }
+
+  /**
+   * Atualiza uma das datas do rascunho, mantendo a outra com o valor atual.
+   * @param campo Qual data mudou.
+   * @param valor Nova data (AAAA-MM-DD).
+   */
+  function alterarData(campo: 'inicio' | 'fim', valor: string): void {
+    setRascunho({
+      inicio: campo === 'inicio' ? valor : valorInicio,
+      fim: campo === 'fim' ? valor : valorFim,
+    })
+  }
+
+  /** Aplica o intervalo digitado: o gráfico se ajusta a ele. */
+  function aplicar(): void {
+    if (rascunho && podeAplicar) setAplicado(rascunho)
+  }
+
+  /** Limpa as datas digitadas e volta às datas automáticas do período escolhido. */
+  function limpar(): void {
+    setAplicado(null)
+    setRascunho(null)
+  }
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           role="group"
-          aria-label="Período do gráfico"
-          className="inline-flex rounded-md border border-slate-700 p-0.5"
+          aria-label="Seletor de período"
+          className="flex flex-wrap items-center gap-2"
         >
-          {PERIODOS.map((p) => (
-            <button
-              key={p.valor}
-              type="button"
-              aria-pressed={p.valor === periodo}
-              onClick={() => setPeriodo(p.valor)}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-                p.valor === periodo
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'text-slate-400 hover:text-slate-100'
-              }`}
-            >
-              {p.rotulo}
-            </button>
-          ))}
+          <div
+            role="group"
+            aria-label="Período do gráfico"
+            className="inline-flex rounded-md border border-slate-700 p-0.5"
+          >
+            {PERIODOS.map((p) => {
+              const selecionado = !aplicado && p.valor === periodoBotao
+              return (
+                <button
+                  key={p.valor}
+                  type="button"
+                  aria-pressed={selecionado}
+                  onClick={() => escolherPeriodo(p.valor)}
+                  className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                    selecionado
+                      ? 'bg-slate-100 text-slate-900'
+                      : 'text-slate-400 hover:text-slate-100'
+                  }`}
+                >
+                  {p.rotulo}
+                </button>
+              )
+            })}
+          </div>
+          <label className="flex items-center gap-1 text-sm text-slate-400">
+            De
+            <input
+              type="date"
+              value={valorInicio}
+              max={valorFim || hoje}
+              onChange={(e) => alterarData('inicio', e.target.value)}
+              className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+            />
+          </label>
+          <label className="flex items-center gap-1 text-sm text-slate-400">
+            Até
+            <input
+              type="date"
+              value={valorFim}
+              min={valorInicio || undefined}
+              max={hoje}
+              onChange={(e) => alterarData('fim', e.target.value)}
+              className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={aplicar}
+            disabled={!podeAplicar}
+            className="rounded-md bg-alta px-3 py-1 text-xs font-semibold text-white transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Aplicar
+          </button>
+          <button
+            type="button"
+            onClick={limpar}
+            className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:text-slate-100"
+          >
+            Limpar
+          </button>
+          {datasInvalidas && (
+            <span className="text-sm text-baixa">A data inicial é posterior à final.</span>
+          )}
         </div>
+      </div>
 
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <div role="group" aria-label="Médias móveis" className="inline-flex gap-2">
           <BotaoToggle
             ativo={mostrarMM20}
@@ -331,7 +602,7 @@ export default function GraficoCandlestick({ ticker }: PropsGrafico) {
         ref={wrapperRef}
         role="region"
         aria-label={`Gráfico de candles de ${ticker}`}
-        className="relative flex h-[340px] w-full flex-col sm:h-[480px] lg:h-[calc(100vh-380px)] lg:min-h-[440px]"
+        className="relative flex h-[340px] w-full flex-col sm:h-[480px] lg:h-[calc(100vh-440px)] lg:min-h-[400px]"
       >
         <div ref={precoRef} style={{ height: `${FRACAO_PRECO * 100}%` }} className="w-full" />
         <div
@@ -388,9 +659,9 @@ export default function GraficoCandlestick({ ticker }: PropsGrafico) {
         )}
       </div>
 
-      {data && data.length > 0 && (
+      {dadosExibidos && dadosExibidos.length > 0 && (
         <p className="text-xs text-slate-500">
-          Atualizado às {formatarHora(new Date())} · {data.length} candles
+          Atualizado às {formatarHora(new Date())} · {dadosExibidos.length} candles
         </p>
       )}
     </div>

@@ -187,7 +187,7 @@ export default function BuscaAtivo({ ativos }: PropsBuscaAtivo) {
     aberto && !mostrandoHistorico && consulta.length >= MIN_CARACTERES && opcoes.length === 0
 
   return (
-    <div ref={containerRef} className="relative w-full sm:w-72">
+    <div ref={containerRef} className="relative w-full sm:w-[28rem]">
       <input
         type="search"
         role="combobox"
@@ -206,7 +206,7 @@ export default function BuscaAtivo({ ativos }: PropsBuscaAtivo) {
         }}
         onFocus={() => setAberto(true)}
         onKeyDown={aoTeclar}
-        className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
+        className="w-full rounded-md border border-slate-700 bg-slate-900 px-4 py-3 text-xl text-slate-100 placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
       />
 
       {listaVisivel && (

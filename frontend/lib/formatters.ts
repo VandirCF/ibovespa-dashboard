@@ -98,3 +98,45 @@ export function formatarDataHora(data: Date): string {
     minute: '2-digit',
   })
 }
+
+/**
+ * Formata data curta (dd/mm/aa) no fuso de Brasília, para eixos e intervalos de datas.
+ * @param data Instante ou data ISO.
+ * @returns Texto no formato "30/10/26".
+ */
+export function formatarDataCurta(data: Date | string): string {
+  const instante = typeof data === 'string' ? new Date(data) : data
+  return instante.toLocaleDateString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  })
+}
+
+/**
+ * Formata data e hora curtas (dd/mm/aa HH:mm), sem vírgula, no fuso de Brasília.
+ * @param data Instante a ser formatado.
+ * @returns Texto no formato "30/10/26 11:50".
+ */
+export function formatarDataHoraCurta(data: Date): string {
+  const hora = data.toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  return `${formatarDataCurta(data)} ${hora}`
+}
+
+/**
+ * Formata somente a hora (HH:mm) no fuso de Brasília, para o eixo de períodos intradiários.
+ * @param data Instante a ser formatado.
+ * @returns Texto no formato "11:50".
+ */
+export function formatarHoraCurta(data: Date): string {
+  return data.toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}

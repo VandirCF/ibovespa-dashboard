@@ -19,14 +19,14 @@ export default function BadgeMercado() {
   }, [])
 
   if (aberto === null) {
-    return <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs text-slate-400">…</span>
+    return <span className="rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-400">…</span>
   }
   return aberto ? (
-    <span className="rounded-full bg-alta/20 px-2.5 py-0.5 text-xs font-medium text-alta">
+    <span className="rounded-full bg-alta/20 px-3 py-1 text-sm font-medium text-alta">
       Mercado aberto
     </span>
   ) : (
-    <span className="rounded-full bg-slate-700/60 px-2.5 py-0.5 text-xs font-medium text-slate-300">
+    <span className="rounded-full bg-slate-700/60 px-3 py-1 text-sm font-medium text-slate-300">
       Mercado fechado
     </span>
   )

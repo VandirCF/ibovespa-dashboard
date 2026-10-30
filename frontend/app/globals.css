@@ -2,14 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Tema escuro (padrão). Os nomes sN seguem a escala slate do Tailwind.
+ * Valores em RGB separados por espaço, lidos pelo tailwind.config.ts.
+ */
 :root {
   color-scheme: dark;
-  --background: #0f172a;
-  --foreground: #e2e8f0;
+  --fundo: 15 23 42;
+  --s50: 248 250 252;
+  --s100: 241 245 249;
+  --s200: 226 232 240;
+  --s300: 203 213 225;
+  --s400: 148 163 184;
+  --s500: 100 116 139;
+  --s600: 71 85 105;
+  --s700: 51 65 85;
+  --s800: 30 41 59;
+  --s900: 15 23 42;
+  --s950: 2 6 23;
+  --destaque: 5 46 22;
+}
+
+/*
+ * Tema claro: a escala é invertida, então text-slate-100 continua sendo o texto principal
+ * e bg-slate-900 continua sendo a superfície de cartões. Ajuste aqui, não nos componentes.
+ */
+:root[data-tema='claro'] {
+  color-scheme: light;
+  --fundo: 248 250 252;
+  --s50: 2 6 23;
+  --s100: 15 23 42;
+  --s200: 30 41 59;
+  --s300: 51 65 85;
+  --s400: 71 85 105;
+  --s500: 100 116 139;
+  --s600: 148 163 184;
+  --s700: 203 213 225;
+  --s800: 226 232 240;
+  --s900: 241 245 249;
+  --s950: 248 250 252;
+  --destaque: 220 252 231;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: rgb(var(--fundo));
+  color: rgb(var(--s200));
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Barra superior com destaque: gradiente da cor de destaque até o fundo e linha verde embaixo. */
+.barra-topo {
+  background: linear-gradient(90deg, rgb(var(--destaque)) 0%, rgb(var(--fundo)) 75%);
+  border-bottom: 2px solid #16a34a;
 }

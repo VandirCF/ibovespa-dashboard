@@ -27,11 +27,11 @@ export default function PainelAtivos({ inicial }: PropsPainelAtivos) {
 
   return (
     <>
-      <Cabecalho atualizadoEm={atualizadoEm}>
+      <Cabecalho atualizadoEm={atualizadoEm} largura="total">
         <BuscaAtivo ativos={data ?? []} />
       </Cabecalho>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
         <h1 className="mb-4 text-xl font-semibold text-slate-100">Principais ativos do IBovespa</h1>
         <ListaAtivos
           ativos={data}
