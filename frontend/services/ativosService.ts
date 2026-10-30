@@ -41,3 +41,21 @@ export async function buscarAtivos(opcoes?: RequestInit): Promise<AtivoPreco[]> 
 export async function buscarAtivosNoServidor(): Promise<AtivoPreco[]> {
   return buscarAtivos({ next: { revalidate: LISTA_REVALIDATE_SEGUNDOS } } as RequestInit)
 }
+
+/**
+ * Busca a cotação de um ativo no servidor do Next.js, com revalidação de 300s.
+ * @param ticker Ticker já validado, ex.: "PETR4".
+ * @returns Cotação do ativo, ou null se a API não tiver cotação para ele (404).
+ * @throws Error se a API estiver indisponível (5xx ou falha de rede).
+ */
+export async function buscarAtivoNoServidor(ticker: string): Promise<AtivoPreco | null> {
+  const resposta = await fetch(`${API_URL}/api/ativos/${ticker}`, {
+    next: { revalidate: LISTA_REVALIDATE_SEGUNDOS },
+  } as RequestInit)
+  if (resposta.status === 404) return null
+  if (!resposta.ok) {
+    throw new Error(`Falha ao carregar ${ticker} (HTTP ${resposta.status})`)
+  }
+  const dados: unknown = await resposta.json()
+  return AtivoPrecoSchema.parse(dados)
+}

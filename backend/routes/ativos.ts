@@ -7,8 +7,22 @@ import { getListaIbovespa, getPrecoAtivo } from '../services/brapiService'
 /** Mensagem genérica para falhas de fonte externa (não expõe detalhes internos). */
 const MENSAGEM_INDISPONIVEL = 'Cotações indisponíveis no momento. Tente novamente em instantes.'
 
-/** Setor em pt-BR por ticker, a partir da lista IBovespa. */
-const SETOR_POR_TICKER = new Map(ATIVOS_IBOVESPA.map((a) => [a.ticker, a.setor]))
+/** Nome e setor em pt-BR do cadastro IBovespa, por ticker. */
+const CADASTRO_POR_TICKER = new Map(ATIVOS_IBOVESPA.map((a) => [a.ticker, a]))
+
+/**
+ * Completa a cotação com nome e setor do cadastro local, quando o ticker estiver nele.
+ * @param ativo Cotação vinda da brapi ou do Yahoo.
+ * @returns Cotação com nome e setor em pt-BR quando disponíveis.
+ */
+function comCadastro(ativo: AtivoPreco): AtivoPreco {
+  const cadastro = CADASTRO_POR_TICKER.get(ativo.ticker)
+  return {
+    ...ativo,
+    nome: cadastro?.nome ?? ativo.nome,
+    setor: cadastro?.setor,
+  }
+}
 
 /**
  * Rotas de ativos: lista do IBovespa e cotação individual.
@@ -21,7 +35,7 @@ export async function ativosRoutes(app: FastifyInstance): Promise<void> {
   app.get('/ativos', async (_req, reply: FastifyReply): Promise<AtivoPreco[] | FastifyReply> => {
     try {
       const lista = await getListaIbovespa()
-      return lista.map((ativo) => ({ ...ativo, setor: SETOR_POR_TICKER.get(ativo.ticker) }))
+      return lista.map(comCadastro)
     } catch (erro: unknown) {
       app.log.error({ err: erro }, 'Falha ao montar lista de ativos')
       return reply.code(503).send({ erro: MENSAGEM_INDISPONIVEL })
@@ -43,7 +57,7 @@ export async function ativosRoutes(app: FastifyInstance): Promise<void> {
         if (!ativo) {
           return reply.code(404).send({ erro: `Ativo ${ticker} não encontrado` })
         }
-        return { ...ativo, setor: SETOR_POR_TICKER.get(ticker) }
+        return comCadastro(ativo)
       } catch (erro: unknown) {
         app.log.error({ err: erro, ticker }, 'Falha ao buscar cotação')
         return reply.code(503).send({ erro: MENSAGEM_INDISPONIVEL })

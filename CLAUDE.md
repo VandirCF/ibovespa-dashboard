@@ -181,6 +181,7 @@ Todas as variáveis estão documentadas em `backend/.env.example` e `frontend/.e
 BRAPI_TOKEN=           # Token da brapi.dev (obrigatório)
 ALPHA_VANTAGE_KEY=     # Chave Alpha Vantage (opcional, tem fallback)
 ANTHROPIC_API_KEY=     # Chave Claude API (obrigatório para recomendações)
+ADMIN_API_KEY=         # Chave do painel /admin/jobs/status (header x-api-key)
 
 # Banco e cache
 DATABASE_URL=          # postgresql://user:pass@localhost:5432/ibovespa

@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { z } from 'zod'
-import type { AtivoPreco } from '../types'
+import type { AtivoPreco, Candle, Periodo } from '../types'
 import { ATIVOS_IBOVESPA } from '../lib/ativos-ibovespa'
 import { PRECO_TTL, cache } from '../lib/cache'
 import { env } from '../lib/env'
@@ -229,4 +229,66 @@ export async function getListaIbovespa(): Promise<AtivoPreco[]> {
     )
     return cotacoes
   })
+}
+
+/** Parâmetros da brapi (range e interval) para cada período do gráfico. */
+const PARAMS_HISTORICO_BRAPI: Readonly<Record<Periodo, { range: string; interval: string }>> = {
+  '1d': { range: '1d', interval: '5m' },
+  '1w': { range: '5d', interval: '1h' },
+  '1m': { range: '1mo', interval: '1d' },
+  '3m': { range: '3mo', interval: '1d' },
+  '1y': { range: '1y', interval: '1d' },
+  '5y': { range: '5y', interval: '1wk' },
+}
+
+const HistoricoRespostaSchema = z.object({
+  results: z.array(
+    z.object({
+      historicalDataPrice: z
+        .array(
+          z.object({
+            date: z.number(),
+            open: z.number().nullable(),
+            high: z.number().nullable(),
+            low: z.number().nullable(),
+            close: z.number().nullable(),
+            volume: z.number().nullable(),
+            adjustedClose: z.number().nullable().optional(),
+          }),
+        )
+        .optional(),
+    }),
+  ),
+})
+
+/**
+ * Busca o histórico OHLCV de um ativo na brapi (sem cache). Os preços são ajustados pelo
+ * fator adjustedClose / close, para manter a série contínua (dividendos e eventos societários).
+ * @param ticker Ticker normalizado, ex.: "MGLU3".
+ * @param periodo Período do gráfico.
+ * @returns Candles ordenados do mais antigo para o mais recente (candles incompletos são descartados).
+ * @throws Erro de rede, de autenticação ou resposta fora do schema esperado.
+ */
+export async function buscarHistoricoBrapi(ticker: string, periodo: Periodo): Promise<Candle[]> {
+  const { range, interval } = PARAMS_HISTORICO_BRAPI[periodo]
+  const { data } = await brapiHttp.get<unknown>(`/quote/${ticker}`, {
+    params: { range, interval, ...paramsAutenticacao() },
+  })
+  const resposta = HistoricoRespostaSchema.parse(data)
+  const historico = resposta.results[0]?.historicalDataPrice ?? []
+
+  const candles: Candle[] = []
+  for (const h of historico) {
+    if (h.open === null || h.high === null || h.low === null || h.close === null) continue
+    const fator = h.adjustedClose != null && h.close !== 0 ? h.adjustedClose / h.close : 1
+    candles.push({
+      timestamp: new Date(h.date * 1000).toISOString(),
+      open: h.open * fator,
+      high: h.high * fator,
+      low: h.low * fator,
+      close: h.close * fator,
+      volume: h.volume ?? 0,
+    })
+  }
+  return candles
 }

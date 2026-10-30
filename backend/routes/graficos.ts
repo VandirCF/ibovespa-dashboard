@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import type { Candle } from '../types'
-import { getHistorico } from '../services/yahooService'
+import { getHistoricoAtivo } from '../services/historicoService'
 import { TICKER_REGEX, normalizarTicker } from '../lib/tickers'
 
 const PeriodoSchema = z.enum(['1d', '1w', '1m', '3m', '1y', '5y']).default('1m')
@@ -29,7 +29,7 @@ export async function graficosRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ erro: 'Período inválido. Use 1d, 1w, 1m, 3m, 1y ou 5y' })
       }
       try {
-        return await getHistorico(ticker, periodo.data)
+        return await getHistoricoAtivo(ticker, periodo.data)
       } catch (erro: unknown) {
         app.log.error({ err: erro, ticker }, 'Falha ao buscar histórico')
         return reply.code(503).send({ erro: MENSAGEM_INDISPONIVEL })

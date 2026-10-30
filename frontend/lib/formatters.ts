@@ -82,3 +82,19 @@ export function formatarHora(data: Date): string {
     second: '2-digit',
   })
 }
+
+/**
+ * Formata data e hora no fuso de Brasília.
+ * @param data Instante a ser formatado.
+ * @returns Texto no formato "09/04/2026 14:05".
+ */
+export function formatarDataHora(data: Date): string {
+  return data.toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}

@@ -284,10 +284,10 @@ Busque os dados via fetch no servidor (Server Component) com revalidate de 300s.
 ```
 
 **Critério de conclusão:**
-- [ ] Página /ativo/PETR4 carrega com dados corretos
-- [ ] Badge de mercado aberto/fechado exibido corretamente
-- [ ] As 3 abas funcionam e trocam conteúdo sem reload
-- [ ] Metadados SEO presentes no HTML
+- [x] Página /ativo/PETR4 carrega com dados corretos
+- [x] Badge de mercado aberto/fechado exibido corretamente
+- [x] As 3 abas funcionam e trocam conteúdo sem reload
+- [x] Metadados SEO presentes no HTML
 
 ---
 
@@ -315,10 +315,10 @@ Crie o componente /components/GraficoCandlestick.tsx usando lightweight-charts:
 **Critério de conclusão:**
 - [ ] Candlestick renderiza corretamente para PETR4 período 1M
 - [ ] Trocar período recarrega os dados sem piscar a tela
-- [ ] Volume aparece no subgráfico
+- [x] Volume aparece no subgráfico
 - [ ] Tooltip aparece ao passar o mouse
 - [ ] Médias móveis funcionam como toggle
-- [ ] Responsivo em mobile (375px)
+- [x] Responsivo em mobile (375px)
 
 ---
 
@@ -344,8 +344,8 @@ Crie o worker de coleta em /server/jobs/coletaHistorico.ts usando BullMQ:
 **Critério de conclusão:**
 - [ ] Job roda manualmente sem erros (`queue.add('coleta-diaria', {})`)
 - [ ] Dados são inseridos na tabela PrecoHistorico
-- [ ] Falha em um ativo não interrompe os demais
-- [ ] Rota /admin/jobs/status retorna status da fila
+- [x] Falha em um ativo não interrompe os demais
+- [x] Rota /admin/jobs/status retorna status da fila
 
 ---
 

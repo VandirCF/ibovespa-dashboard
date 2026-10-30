@@ -1,7 +1,6 @@
 import yahooFinance from 'yahoo-finance2'
 import { z } from 'zod'
 import type { AtivoPreco, Candle, Periodo } from '../types'
-import { cache } from '../lib/cache'
 import { logger } from '../lib/logger'
 import { normalizarTicker, paraSimboloYahoo } from '../lib/tickers'
 
@@ -88,42 +87,39 @@ export async function getCotacoesYahoo(tickers: readonly string[]): Promise<Ativ
 }
 
 /**
- * Retorna o histórico OHLCV de um ativo para o período pedido, com cache por período.
- * Tickers sem sufixo `.SA` são normalizados automaticamente.
- * @param ticker Ticker do ativo, ex.: "PETR4".
- * @param periodo Um de '1d' | '1w' | '1m' | '3m' | '1y' | '5y'.
- * @returns Lista de candles ordenada por data (mais antiga primeiro).
+ * Busca candles OHLCV no Yahoo Finance sem cache. Usado pelo cache de gráficos e pelo job de coleta.
+ * @param ticker Ticker, com ou sem `.SA`.
+ * @param diasAtras Janela de dias a partir de hoje.
+ * @param intervalo Intervalo do candle.
+ * @returns Candles válidos ordenados pelo Yahoo (candles com valores nulos são descartados).
  * @throws Erro de rede ou da biblioteca yahoo-finance2.
  */
-export async function getHistorico(ticker: string, periodo: Periodo): Promise<Candle[]> {
-  const t = normalizarTicker(ticker)
-  const config = CONFIG_PERIODOS[periodo]
-  const chave = `hist:${t}:${periodo}`
-
-  return cache.getOrSet(chave, config.ttlSegundos, async (): Promise<Candle[]> => {
-    const inicio = new Date(Date.now() - config.diasAtras * 24 * 60 * 60 * 1000)
-    const resultado: unknown = await yahooFinance.chart(paraSimboloYahoo(t), {
-      period1: inicio,
-      interval: config.intervalo,
-    })
-
-    const quotes = z.object({ quotes: z.array(z.unknown()) }).parse(resultado).quotes
-    const candles: Candle[] = []
-    for (const item of quotes) {
-      const parse = CandleSchema.safeParse(item)
-      if (!parse.success) continue
-      const c = parse.data
-      if (c.open === null || c.high === null || c.low === null || c.close === null) continue
-      candles.push({
-        timestamp: c.date.toISOString(),
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.volume ?? 0,
-      })
-    }
-    logger.debug({ ticker: t, periodo, total: candles.length }, 'histórico obtido no Yahoo')
-    return candles
+export async function buscarCandlesYahoo(
+  ticker: string,
+  diasAtras: number,
+  intervalo: ConfigPeriodo['intervalo'],
+): Promise<Candle[]> {
+  const inicio = new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000)
+  const resultado: unknown = await yahooFinance.chart(paraSimboloYahoo(ticker), {
+    period1: inicio,
+    interval: intervalo,
   })
+
+  const quotes = z.object({ quotes: z.array(z.unknown()) }).parse(resultado).quotes
+  const candles: Candle[] = []
+  for (const item of quotes) {
+    const parse = CandleSchema.safeParse(item)
+    if (!parse.success) continue
+    const c = parse.data
+    if (c.open === null || c.high === null || c.low === null || c.close === null) continue
+    candles.push({
+      timestamp: c.date.toISOString(),
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+      volume: c.volume ?? 0,
+    })
+  }
+  return candles
 }

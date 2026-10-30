@@ -6,6 +6,8 @@ import { ativosRoutes } from './routes/ativos'
 import { graficosRoutes } from './routes/graficos'
 import { fatosRoutes } from './routes/fatos'
 import { recomendacoesRoutes } from './routes/recomendacoes'
+import { adminRoutes } from './routes/admin'
+import { iniciarColeta } from './jobs/coletaHistorico'
 
 /** Limite de requisições por IP na API pública (PRD 4.3). */
 const RATE_LIMIT_MAX = 60
@@ -41,6 +43,8 @@ export async function criarServidor(): Promise<FastifyInstance> {
   await app.register(fatosRoutes, { prefix: '/api' })
   await app.register(recomendacoesRoutes, { prefix: '/api' })
 
+  await app.register(adminRoutes)
+
   return app
 }
 
@@ -51,6 +55,7 @@ export async function criarServidor(): Promise<FastifyInstance> {
 async function main(): Promise<void> {
   const app = await criarServidor()
   await app.listen({ port: env.PORT, host: '0.0.0.0' })
+  await iniciarColeta()
 }
 
 if (require.main === module) {
